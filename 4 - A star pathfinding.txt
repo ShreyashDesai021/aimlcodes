@@ -1,0 +1,213 @@
+4. Develop a pathfinding solution using the A* algorithm for a maze-based game environment. The agent must find the most cost-efficient route from the start position to the goal, considering movement costs and a suitable heuristic function (e.g., Manhattan distance) to guide the search efficiently. 
+Code:
+import heapq  # for priority queue
+
+
+# A* Algorithm (for Maze Pathfinding)
+
+
+# Formula:
+# f(n) = g(n) + h(n)
+# where:
+#   g(n) → cost from start to current cell
+#   h(n) → heuristic (Manhattan distance to goal)
+
+
+def a_star_search(maze, start, goal):
+    rows, cols = len(maze), len(maze[0])
+
+
+    # 4-directional movement (up, down, left, right)
+    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+
+
+    # Priority queue → stores (f, g, position, path)
+    open_list = []
+    heapq.heappush(open_list, (0 + heuristic(start, goal), 0, start, [start]))
+
+
+    visited = set()
+
+
+    while open_list:
+        f, g, (x, y), path = heapq.heappop(open_list)
+
+
+        # If already visited, skip
+        if (x, y) in visited:
+            continue
+        visited.add((x, y))
+
+
+        # Goal reached
+        if (x, y) == goal:
+            print("\n Path found!")
+            print("Path:", path)
+            print("Total Cost (Σg):", g)
+            print("Number of Steps:", len(path) - 1)
+            return path
+
+
+        # Explore neighbors
+        for dx, dy in directions:
+            nx, ny = x + dx, y + dy
+
+
+            # Check boundaries and obstacles
+            if 0 <= nx < rows and 0 <= ny < cols and maze[nx][ny] == 0:
+                new_g = g + 1  # Each step cost = 1
+                new_f = new_g + heuristic((nx, ny), goal)
+                heapq.heappush(open_list, (new_f, new_g, (nx, ny), path + [(nx, ny)]))
+
+
+    print("\n No path found.")
+    return None
+
+
+# Heuristic Function (Manhattan Distance)
+
+
+# h(n) = |x1 - x2| + |y1 - y2|
+def heuristic(a, b):
+    return abs(a[0] - b[0]) + abs(a[1] - b[1])
+
+
+# Example Maze (0 = Free cell, 1 = Wall)
+maze = [
+    [0, 1, 0, 0, 0],
+    [0, 1, 0, 1, 0],
+    [0, 0, 0, 1, 0],
+    [0, 1, 1, 0, 0],
+    [0, 0, 0, 0, 0]
+]
+
+
+# Start & Goal positions (row, col)
+start = (0, 0)
+goal = (4, 4)
+
+
+# Run A* Search
+print(" A* Pathfinding in Maze:")
+a_star_search(maze, start, goal)
+
+
+User Input:
+import heapq  # For priority queue (min-heap)
+
+
+# --------------------------------------------
+# A* Algorithm for Maze Pathfinding
+# Formula:
+# f(n) = g(n) + h(n)
+# where:
+#   g(n) → Cost from start to current cell
+#   h(n) → Heuristic (Manhattan distance to goal)
+# A* combines actual cost (g) and estimated cost (h)
+# to always find the most cost-efficient (optimal) path.
+
+
+def a_star_search(maze, start, goal):
+    rows, cols = len(maze), len(maze[0])
+    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]  # Up, Down, Left, Right
+
+
+    # Priority Queue: stores (f, g, (x, y), path)
+    open_list = []
+    heapq.heappush(open_list, (0 + heuristic(start, goal), 0, start, [start]))
+
+
+    visited = set()
+
+
+    while open_list:
+        f, g, (x, y), path = heapq.heappop(open_list)
+
+
+        if (x, y) in visited:
+            continue
+        visited.add((x, y))
+
+
+        # Step 1: Goal test
+        if (x, y) == goal:
+            print("\nPath found!")
+            print("Path:", path)
+            print("Total Cost (Σg):", g)
+            print("Number of Steps:", len(path) - 1)
+            return path
+
+
+        # Step 2: Explore neighbors
+        for dx, dy in directions:
+            nx, ny = x + dx, y + dy
+
+
+            # Step 3: Boundary & obstacle check
+            if 0 <= nx < rows and 0 <= ny < cols and maze[nx][ny] == 0:
+                new_g = g + 1  # Each move costs 1
+                new_f = new_g + heuristic((nx, ny), goal)
+                heapq.heappush(open_list, (new_f, new_g, (nx, ny), path + [(nx, ny)]))
+
+
+    print("\nNo path found.")
+    return None
+
+
+# Heuristic Function (Manhattan Distance)
+# h(n) = |x1 - x2| + |y1 - y2|
+def heuristic(a, b):
+    return abs(a[0] - b[0]) + abs(a[1] - b[1])
+
+
+# USER INPUT SECTION
+print("A* Pathfinding in Maze (User Input Version)\n")
+
+
+# Step 1: Get maze dimensions
+rows = int(input("Enter number of rows in maze: "))
+cols = int(input("Enter number of columns in maze: "))
+
+
+# Step 2: Get maze layout
+maze = []
+print("\nEnter the maze grid (0 = Free cell, 1 = Wall):")
+for i in range(rows):
+    row = list(map(int, input(f"  Row {i+1}: ").split()))
+    if len(row) != cols:
+        print("Each row must have exactly", cols, "values.")
+        exit()
+    maze.append(row)
+
+
+# Step 3: Get start and goal positions
+print("\nEnter Start and Goal positions as row col (0-indexed):")
+start = tuple(map(int, input("Start position: ").split()))
+goal = tuple(map(int, input("Goal position: ").split()))
+
+
+# Run A* Algorithm
+print("\nRunning A* Search...")
+a_star_search(maze, start, goal)
+
+
+
+
+#User Input
+'''
+Enter number of rows in maze: 5
+Enter number of columns in maze: 5
+
+
+Enter the maze grid (0 = Free cell, 1 = Wall):
+  Row 1: 0 1 0 0 0
+  Row 2: 0 1 0 1 0
+  Row 3: 0 0 0 1 0
+  Row 4: 0 1 1 0 0
+  Row 5: 0 0 0 0 0
+
+
+Enter Start and Goal positions as row col (0-indexed):
+Start position: 0 0
+Goal position: 4 4
+'''

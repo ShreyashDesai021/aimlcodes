@@ -1,0 +1,317 @@
+
+# Imports
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Inline plots (if running in Jupyter)
+# %matplotlib inline
+
+# Load dataset (make sure the CSV is in the same directory or update the path)
+file_path = "student_exam_scores_12_13.csv"
+data = pd.read_csv(file_path)
+
+print("Dataset Preview:\n")
+print(data.head())
+
+
+print("\nDataset Shape:", data.shape)
+print("\nMissing Values by Column:\n", data.isnull().sum())
+
+
+# -----------------------------
+# Step 1: Data Preprocessing
+# -----------------------------
+
+# Drop rows with missing values (if any)
+data = data.dropna().copy()
+
+# Select the required columns:
+X = data["hours_studied"].values.astype(float) #independent var
+Y = data["exam_score"].values.astype(float) # dependent var
+
+print(f"Total valid rows after preprocessing: {len(X)}")
+print(X[:5])
+
+
+# -----------------------------
+# Step 2: Visualization
+# -----------------------------
+
+plt.figure(figsize=(8, 5))
+plt.scatter(X, Y, s=60, label="Data points")
+plt.title("Study Hours vs Exam Score")
+plt.xlabel("Study Hours")
+plt.ylabel("Exam Score")
+plt.grid(True)
+plt.legend()
+plt.show()
+
+# -----------------------------
+# Step 2: Visualization
+# -----------------------------
+
+plt.figure(figsize=(8, 5))
+plt.scatter(X, Y, s=60, label="Data points")
+plt.title("Study Hours vs Exam Score")
+plt.xlabel("Study Hours")
+plt.ylabel("Exam Score")
+plt.grid(True)
+plt.legend()
+plt.show()
+
+# Try to find the working dataframe from the existing notebook without altering other logic
+try:
+    _df = data.copy()
+except NameError:
+    try:
+        _df = df.copy()
+    except NameError:
+        # Fallback: try common dataset paths used earlier
+        import os
+        for _p in ["/mnt/data/student_exam_scores_12_13.csv", "/mnt/data/Student_performance_data _.csv"]:
+            if os.path.exists(_p):
+                _df = pd.read_csv(_p)
+                break
+        else:
+            raise RuntimeError("Could not locate a dataframe named `data` or `df`, and no known CSV path exists.")
+
+# Keep only numeric columns
+num_cols = _df.select_dtypes(include=[np.number]).columns.tolist()
+if not num_cols:
+    raise RuntimeError("No numeric columns found for EDA.")
+
+# Histograms
+for col in num_cols:
+    plt.figure()
+    _df[col].hist(bins=20)
+    plt.title(f"Histogram — {col}")
+    plt.xlabel(col)
+    plt.ylabel("Frequency")
+    plt.show()
+
+
+# EDA — Boxplots for numerical features (outlier detection)
+import numpy as np
+import matplotlib.pyplot as plt
+
+num_cols = _df.select_dtypes(include=[np.number]).columns.tolist()
+
+for col in num_cols:
+    plt.figure()
+    plt.boxplot(_df[col].dropna(), vert=True, labels=[col])
+    plt.title(f"Boxplot — {col}")
+    plt.ylabel(col)
+    plt.show()
+
+
+# -----------------------------
+# Step 3: Feature Normalization
+# -----------------------------
+# Normalize features for faster convergence (and stable numerics):
+# X = (X - mean(X)) / std(X)
+
+X = (X - np.mean(X)) / np.std(X)
+print("First 10 normalized X values:\n", X[:10])
+
+
+# -----------------------------
+# Step 3: Feature Normalization
+# -----------------------------
+# Normalize features for faster convergence (and stable numerics):
+# X = (X - mean(X)) / std(X)
+
+X = (X - np.mean(X)) / np.std(X)
+print("First 10 normalized X values:\n", X[:10])
+
+
+# -----------------------------
+# Step 6: Prediction
+# -----------------------------
+def predict(X, m, c):
+    return m * X + c
+
+Y_pred = predict(X, m, c)
+print("First 10 predictions:\n", Y_pred[:10])
+
+
+# -----------------------------
+# Step 7: Visualize Regression Line
+# -----------------------------
+plt.figure(figsize=(8, 5))
+plt.scatter(X, Y, s=60, label="Actual Data")
+plt.plot(X, Y_pred, label="Regression Line",color="red")
+plt.title("Linear Regression (From Scratch)")
+plt.xlabel("Normalized Study Hours")
+plt.ylabel("Exam Score")
+plt.grid(True)
+plt.legend()
+plt.show()
+
+
+# -----------------------------
+# Step 8: Evaluation Metrics (MSE and R^2) Manually
+# -----------------------------
+def mean_squared_error(y_true, y_pred):
+    return sum((y_true - y_pred) ** 2) / len(y_true)
+
+def r2_score(y_true, y_pred):
+    ss_res = sum((y_true - y_pred) ** 2)
+    ss_tot = sum((y_true - np.mean(y_true)) ** 2)
+    return 1 - (ss_res / ss_tot)
+
+mse = mean_squared_error(Y, Y_pred)
+r2 = r2_score(Y, Y_pred)
+
+print(f"Mean Squared Error (MSE): {mse:.4f}")
+print(f"R^2 Score: {r2:.4f}")
+
+
+# EDA — Histograms for numerical features
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Try to find the working dataframe from the existing notebook without altering other logic
+try:
+    _df = data.copy()
+except NameError:
+    try:
+        _df = df.copy()
+    except NameError:
+        # Fallback: try common dataset paths used earlier
+        import os
+        for _p in ["/mnt/data/student_exam_scores_12_13.csv", "/mnt/data/Student_performance_data _.csv"]:
+            if os.path.exists(_p):
+                _df = pd.read_csv(_p)
+                break
+        else:
+            raise RuntimeError("Could not locate a dataframe named `data` or `df`, and no known CSV path exists.")
+
+# Keep only numeric columns
+num_cols = _df.select_dtypes(include=[np.number]).columns.tolist()
+if not num_cols:
+    raise RuntimeError("No numeric columns found for EDA.")
+
+# Histograms
+for col in num_cols:
+    plt.figure()
+    _df[col].hist(bins=20)
+    plt.title(f"Histogram — {col}")
+    plt.xlabel(col)
+    plt.ylabel("Frequency")
+    plt.show()
+
+# EDA — Boxplots for numerical features (outlier detection)
+import numpy as np
+import matplotlib.pyplot as plt
+
+num_cols = _df.select_dtypes(include=[np.number]).columns.tolist()
+
+for col in num_cols:
+    plt.figure()
+    plt.boxplot(_df[col].dropna(), vert=True, labels=[col])
+    plt.title(f"Boxplot — {col}")
+    plt.ylabel(col)
+    plt.show()
+
+
+# Linear Regression with Gradient Descent — single feature, from scratch (no sklearn)
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# 0) Select the right feature/target from your existing dataframe
+#    Prefer pairs used in your course problems: (StudyTimeWeekly -> GPA) OR (hours_studied -> exam_score)
+candidates = [
+    ("StudyTimeWeekly", "GPA"),
+    ("hours_studied", "exam_score"),
+]
+
+X = y = None
+for fx, ty in candidates:
+    if fx in _df.columns and ty in _df.columns:
+        X = _df[fx].to_numpy(dtype=float)
+        y = _df[ty].to_numpy(dtype=float)
+        feature_name, target_name = fx, ty
+        break
+
+if X is None or y is None:
+    raise RuntimeError("Expected columns not found. Need either (StudyTimeWeekly, GPA) or (hours_studied, exam_score).")
+
+# 1) Hypothesis: Y = m*X + c
+# 2) Initialize parameters
+m = 0.0  # slope
+c = 0.0  # intercept
+
+# Hyperparameters (kept simple; do NOT add unnecessary changes)
+alpha = 0.01      # learning rate
+epochs = 5000     # max iterations
+tol = 1e-9        # stop if cost improvement is negligible
+
+n = len(X)
+cost_history = []
+
+def mse_cost(m, c, X, y):
+    y_pred = m * X + c
+    return (1/(2*n)) * np.sum((y_pred - y)**2)  # classic J(m,c) form
+
+# 3) Initial cost
+prev_cost = mse_cost(m, c, X, y)
+
+# 4) Gradient Descent loop (compute gradients and update)
+for i in range(epochs):
+    y_pred = m * X + c
+    error = y_pred - y
+
+    # Gradients (derivatives of J with respect to m and c)
+    dm = (1/n) * np.sum(error * X)
+    dc = (1/n) * np.sum(error)
+
+    # 5) Parameter updates
+    m = m - alpha * dm
+    c = c - alpha * dc
+
+    # Track cost and check for convergence
+    cost = mse_cost(m, c, X, y)
+    cost_history.append(cost)
+    if abs(prev_cost - cost) < tol:
+        break
+    prev_cost = cost
+
+print(f"Feature used: {feature_name}  ->  Target: {target_name}")
+print(f"""Trained parameters (Gradient Descent):
+m (slope)     = {m:.8f}
+c (intercept) = {c:.8f}
+Iterations    = {len(cost_history)}""")
+
+# Evaluation — MSE and R^2 (manual)
+y_hat = m * X + c
+mse = np.mean((y - y_hat)**2)
+
+ss_res = np.sum((y - y_hat)**2)
+ss_tot = np.sum((y - np.mean(y))**2)
+r2 = 1 - ss_res/ss_tot if ss_tot != 0 else float("nan")
+
+print(f"MSE: {mse:.8f}")
+print(f"R^2: {r2:.6f}")
+
+# Visualization — cost curve
+plt.figure()
+plt.plot(cost_history)
+plt.title("Gradient Descent Convergence (Cost vs Iterations)")
+plt.xlabel("Iteration")
+plt.ylabel("Cost (MSE/2)")
+plt.show()
+
+# Visualization — regression line on scatter
+order = np.argsort(X)
+plt.figure()
+plt.scatter(X, y, alpha=0.75, edgecolor="k", label="Data")
+plt.plot(X[order], y_hat[order], linewidth=2, label="Fitted Line (GD)")
+plt.title(f"Linear Regression (GD) — {feature_name} vs {target_name}")
+plt.xlabel(feature_name)
+plt.ylabel(target_name)
+plt.legend()
+plt.show()

@@ -1,0 +1,105 @@
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import KFold
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+import math
+import matplotlib.pyplot as plt
+
+pd.set_option('display.precision', 4)
+
+# Update the path if needed
+DATA_PATH = "student_exam_scores_12_13.csv"
+df = pd.read_csv(DATA_PATH)
+
+print("Shape:", df.shape)
+display(df.head())
+
+feature_cols = ["hours_studied", "attendance_percent", "Internal_marks"]
+target_col = "exam_score"
+
+# Defensive checks
+missing = [c for c in feature_cols + [target_col] if c not in df.columns]
+if missing:
+    raise ValueError(f"Missing required columns: {missing}")
+
+X = df[feature_cols].copy()
+y = df[target_col].astype(float).copy()
+
+display(X.describe().T)
+print("\nTarget summary:")
+display(y.describe())
+
+# Exam score distribution (mirrors 'Price Distribution' in reference)
+plt.figure()
+plt.hist(df[target_col], bins=30)
+plt.title("Exam Score Distribution")
+plt.xlabel("Exam Score")
+plt.ylabel("Count")
+plt.show()
+
+# Scatter plot with best-fit red line
+x = df["hours_studied"]
+y = df[target_col]
+
+plt.scatter(x, y, alpha=0.6, color='blue')
+p = np.poly1d(np.polyfit(x, y, 1))
+plt.plot(np.sort(x), p(np.sort(x)), color='red')
+
+plt.title("Hours Studied vs Exam Score")
+plt.xlabel("Hours Studied")
+plt.ylabel("Exam Score")
+plt.show()
+
+# K-Fold setup and evaluation
+K = 5  # change if needed
+kf = KFold(n_splits=K, shuffle=True, random_state=42)
+
+fold_results = []
+fold_num = 1
+
+for train_idx, test_idx in kf.split(X):
+    X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
+    y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
+
+    model = LinearRegression()
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+
+    r2 = r2_score(y_test, y_pred)
+    rmse = math.sqrt(mean_squared_error(y_test, y_pred))
+    mae = mean_absolute_error(y_test, y_pred)
+
+    fold_results.append({"Fold": fold_num, "R2": r2, "RMSE": rmse, "MAE": mae})
+    fold_num += 1
+
+fold_df = pd.DataFrame(fold_results)
+display(fold_df)
+
+summary = pd.DataFrame({
+    "Metric": ["R2", "RMSE", "MAE"],
+    "Mean": [fold_df["R2"].mean(), fold_df["RMSE"].mean(), fold_df["MAE"].mean()],
+    "Std":  [fold_df["R2"].std(ddof=1), fold_df["RMSE"].std(ddof=1), fold_df["MAE"].std(ddof=1)]
+})
+display(summary)
+
+lr_full = LinearRegression()
+lr_full.fit(X, y)
+
+print("Final model coefficients (aligned with features):")
+coef_table = pd.DataFrame({"Feature": X.columns, "Coefficient": lr_full.coef_})
+display(coef_table)
+print("Intercept:", lr_full.intercept_)
+
+# Predicted vs Actual with best-fit red line
+y_pred_full = lr_full.predict(X)
+
+plt.scatter(y, y_pred_full, alpha=0.6, color='blue')  # blue points
+p = np.poly1d(np.polyfit(y, y_pred_full, 1))          # fit regression line
+plt.plot(np.sort(y), p(np.sort(y)), color='red')      # red line
+
+plt.title("Predicted vs Actual (Full Model)")
+plt.xlabel("Actual Exam Score")
+plt.ylabel("Predicted Exam Score")
+plt.show()
+

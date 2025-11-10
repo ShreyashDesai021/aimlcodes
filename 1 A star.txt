@@ -1,0 +1,580 @@
+1. Implement the Informed Search algorithm for real-life problems.
+Code:
+# A* Search Algorithm (Informed Search)
+# Formula:
+# f(n) = g(n) + h(n)
+# where:
+#   g(n) → Cost from start node to current node
+#   h(n) → Heuristic estimate (cost from current node to goal)
+#   f(n) → Total estimated cost of the cheapest solution through n
+# A* uses both actual cost and estimated cost to find the optimal path.
+# It is both complete and optimal if the heuristic h(n) is admissible.
+
+
+def aStarAlgo(start_node, stop_node):
+    open_set = set([start_node])   # Nodes yet to be evaluated
+    closed_set = set()             # Nodes already evaluated
+    g = {}                         # g(n): cost from start to current node
+    parents = {}                   # Parent mapping to reconstruct final path
+
+
+    # Step 1: Initialize the starting node
+    g[start_node] = 0
+    parents[start_node] = start_node
+
+
+    while open_set:
+        n = None  # Current node to be explored
+
+
+        # Step 2: Choose node with the lowest f(n) = g(n) + h(n)
+        for v in open_set:
+            if n is None or g[v] + heuristic(v) < g[n] + heuristic(n):
+                n = v
+
+
+        # Step 3: If no node left to explore → Path doesn’t exist
+        if n is None:
+            print(" Path does not exist!")
+            return None
+
+
+        # Step 4: Goal test
+        if n == stop_node:
+            path = []
+            total_cost = g[n]
+            while parents[n] != n:
+                path.append(n)
+                n = parents[n]
+            path.append(start_node)
+            path.reverse()
+
+
+            print("\n Path found: {}".format(" → ".join(path)))
+            print("Total cost (Σg):", total_cost)
+            return path
+
+
+        # Step 5: Explore neighbors of current node
+        for (m, weight) in get_neighbors(n):
+            # If neighbor not yet visited → add to open set
+            if m not in open_set and m not in closed_set:
+                open_set.add(m)
+                parents[m] = n
+                g[m] = g[n] + weight   # Update g(n)
+            else:
+                # If we found a cheaper path to neighbor
+                if g[m] > g[n] + weight:
+                    g[m] = g[n] + weight
+                    parents[m] = n
+                    # Move neighbor back to open set if needed
+                    if m in closed_set:
+                        closed_set.remove(m)
+                        open_set.add(m)
+
+
+        # Step 6: Move current node to closed set
+        open_set.remove(n)
+        closed_set.add(n)
+
+
+    print(" Path does not exist!")
+    return None
+
+
+# Helper Function: Return neighbors and their costs
+def get_neighbors(v):
+    return Graph_nodes.get(v, [])
+
+
+# Helper Function: Heuristic h(n)
+# Heuristic is an estimated cost from current node to goal.
+# Must be admissible → never overestimates the true cost.
+def heuristic(n):
+    heuristic_dist = {
+        'A': 11,
+        'B': 6,
+        'C': 99,
+        'D': 1,
+        'E': 7,
+        'G': 0
+    }
+    return heuristic_dist.get(n, float('inf'))
+
+
+# Example Graph (Weighted)
+# Representation:
+# Node : [(Neighbor, Cost)]
+Graph_nodes = {
+    'A': [('B', 2), ('E', 3)],
+    'B': [('C', 1), ('G', 9)],
+    'C': [],
+    'E': [('D', 6)],
+    'D': [('G', 1)],
+    'G': []
+}
+
+
+# Run A* Search
+print(" A* Search Algorithm Execution:")
+aStarAlgo('A', 'G')
+
+User Input:
+# A* Search Algorithm (Informed Search)
+
+
+# Formula:
+# f(n) = g(n) + h(n)
+# where:
+#   g(n) → Cost from start node to current node
+#   h(n) → Heuristic estimate (cost from current node to goal)
+#   f(n) → Total estimated cost of the cheapest solution through n
+# A* uses both actual and estimated costs to find the optimal path.
+# It is both complete and optimal if the heuristic h(n) is admissible.
+
+
+def aStarAlgo(start_node, stop_node):
+    open_set = set([start_node])   # Nodes yet to be evaluated
+    closed_set = set()             # Nodes already evaluated
+    g = {}                         # g(n): cost from start to current node
+    parents = {}                   # Parent mapping to reconstruct final path
+
+
+    # Step 1: Initialize the starting node
+    g[start_node] = 0
+    parents[start_node] = start_node
+
+
+    while open_set:
+        n = None  # Current node to explore
+
+
+        # Step 2: Choose node with lowest f(n) = g(n) + h(n)
+        for v in open_set:
+            if n is None or g[v] + heuristic(v) < g[n] + heuristic(n):
+                n = v
+
+
+        if n is None:
+            print(" Path does not exist!")
+            return None
+
+
+        # Step 3: Goal test
+        if n == stop_node:
+            path = []
+            total_cost = g[n]
+            while parents[n] != n:
+                path.append(n)
+                n = parents[n]
+            path.append(start_node)
+            path.reverse()
+
+
+            print("\n Path found: {}".format(" → ".join(path)))
+            print("Total cost (Σg):", total_cost)
+            return path
+
+
+        # Step 4: Explore neighbors
+        for (m, weight) in get_neighbors(n):
+            if m not in open_set and m not in closed_set:
+                open_set.add(m)
+                parents[m] = n
+                g[m] = g[n] + weight
+            else:
+                # Update path if better one found
+                if g[m] > g[n] + weight:
+                    g[m] = g[n] + weight
+                    parents[m] = n
+                    if m in closed_set:
+                        closed_set.remove(m)
+                        open_set.add(m)
+
+
+        open_set.remove(n)
+        closed_set.add(n)
+
+
+    print(" Path does not exist!")
+    return None
+
+
+# Helper: Return neighbors and their costs
+def get_neighbors(v):
+    return Graph_nodes.get(v, [])
+
+
+# Helper: Heuristic Function h(n)
+def heuristic(n):
+    return heuristic_dist.get(n, float('inf'))
+
+
+# USER INPUT SECTION
+print(" A* Search Algorithm (User Input Version)\n")
+
+
+# Step 1: Get number of nodes
+num_nodes = int(input("Enter number of nodes in the graph: "))
+
+
+Graph_nodes = {}
+heuristic_dist = {}
+
+
+# Step 2: Get graph connections and costs
+for i in range(num_nodes):
+    node = input(f"\nEnter node name {i+1}: ").strip().upper()
+    neighbors = []
+    num_neighbors = int(input(f"Enter number of neighbors of {node}: "))
+    for j in range(num_neighbors):
+        neigh = input(f"  Neighbor {j+1} of {node}: ").strip().upper()
+        cost = int(input(f"  Cost from {node} → {neigh}: "))
+        neighbors.append((neigh, cost))
+    Graph_nodes[node] = neighbors
+
+
+# Step 3: Enter heuristic values for each node
+print("\nEnter heuristic values (h(n)) for each node:")
+for node in Graph_nodes.keys():
+    heuristic_dist[node] = int(input(f"  h({node}) = "))
+
+
+# Step 4: Get start and goal nodes
+start_node = input("\nEnter START node: ").strip().upper()
+goal_node = input("Enter GOAL node: ").strip().upper()
+
+
+# Run A* Algorithm
+print("\n Running A* Search...")
+aStarAlgo(start_node, goal_node)
+
+
+
+
+#User Input:
+#Enter number of nodes in the graph: 6
+
+
+#Enter node name 1: A
+#Enter number of neighbors of A: 2
+#  Neighbor 1 of A: B
+#  Cost from A → B: 2
+#  Neighbor 2 of A: E
+#  Cost from A → E: 3
+
+
+#Enter node name 2: B
+#Enter number of neighbors of B: 2
+#  Neighbor 1 of B: C
+#  Cost from B → C: 1
+#  Neighbor 2 of B: G
+#  Cost from B → G: 9
+
+
+#Enter node name 3: C
+#Enter number of neighbors of C: 0
+
+
+#Enter node name 4: E
+#Enter number of neighbors of E: 1
+#  Neighbor 1 of E: D
+#  Cost from E → D: 6
+
+
+#Enter node name 5: D
+#Enter number of neighbors of D: 1
+#  Neighbor 1 of D: G
+#  Cost from D → G: 1
+
+
+#Enter node name 6: G
+#Enter number of neighbors of G: 0
+
+
+#Enter heuristic values (h(n)) for each node:
+#  h(A) = 11
+#  h(B) = 6
+#  h(C) = 99
+#  h(E) = 7
+#  h(D) = 1
+#  h(G) = 0
+
+
+#Enter START node: A
+#Enter GOAL node: G
+
+What A* is doing (quick idea)
+
+A* searches for the cheapest path from a start node to a goal node.
+For each node v, it balances:
+
+g(v): known cost from start to v
+
+h(v): heuristic estimate from v to goal
+and picks the next node with the smallest f(v) = g(v) + h(v).
+
+Your code follows exactly that flow.
+
+Function header and core data structures
+def aStarAlgo(start_node, stop_node):
+
+
+Defines the A* function that tries to find a path from start_node to stop_node.
+
+    open_set = set([start_node])   # Nodes yet to be evaluated
+
+
+open_set = frontier = nodes discovered but not fully explored yet. Starts with just the start_node.
+
+    closed_set = set()             # Nodes already evaluated
+
+
+closed_set = nodes already fully explored (their neighbors have been processed).
+
+    g = {}                         # g(n): cost from start to current node
+
+
+g stores the best known cost from start to each node encountered.
+
+    parents = {}                   # Parent mapping to reconstruct final path
+
+
+parents lets us rebuild the final path by backtracking from the goal.
+
+Initialization
+    g[start_node] = 0
+
+
+Cost to reach the start is zero.
+
+    parents[start_node] = start_node
+
+
+Parent of start is itself (useful when reconstructing the path).
+
+Main search loop
+    while open_set:
+
+
+Keep searching while there are nodes left to evaluate.
+
+        n = None  # Current node to be explored
+
+
+We’ll select a node n from open_set with the smallest f(n).
+
+Pick node with smallest f = g + h
+        for v in open_set:
+            if n is None or g[v] + heuristic(v) < g[n] + heuristic(n):
+                n = v
+
+
+Linear scan through open_set to find the node n that minimizes g(v) + h(v).
+(Implementation note: a priority queue is faster for large graphs, but this is fine for teaching.)
+
+Safety check (mostly redundant here)
+        if n is None:
+            print(" Path does not exist!")
+            return None
+
+
+If nothing was selected (unlikely since open_set is non-empty), we bail out.
+
+Goal test
+        if n == stop_node:
+            path = []
+            total_cost = g[n]
+            while parents[n] != n:
+                path.append(n)
+                n = parents[n]
+            path.append(start_node)
+            path.reverse()
+
+            print("\n Path found: {}".format(" → ".join(path)))
+            print("Total cost (Σg):", total_cost)
+            return path
+
+
+If the best-looking node is the goal:
+
+Save total_cost = g[goal].
+
+Reconstruct the path by walking parents backward from goal to start.
+
+Reverse it to get start → … → goal.
+
+Print and return.
+
+Expand neighbors
+        for (m, weight) in get_neighbors(n):
+
+
+Loop over each neighbor m of current node n with edge cost weight.
+
+            if m not in open_set and m not in closed_set:
+                open_set.add(m)
+                parents[m] = n
+                g[m] = g[n] + weight   # Update g(n)
+
+
+If m is a brand-new node:
+
+Put it in the frontier,
+
+Set its parent to n,
+
+Set its tentative g(m) = g(n) + weight.
+
+            else:
+                if g[m] > g[n] + weight:
+                    g[m] = g[n] + weight
+                    parents[m] = n
+                    if m in closed_set:
+                        closed_set.remove(m)
+                        open_set.add(m)
+
+
+If we already knew m but we’ve just found a cheaper path to it:
+
+Update g(m) and its parent,
+
+If it was already “closed,” reopen it (move from closed_set back to open_set) because a better route was found.
+
+Move current node to closed
+        open_set.remove(n)
+        closed_set.add(n)
+
+
+We’ve fully explored n — take it off the frontier and mark it as done.
+
+If the loop ends without reaching goal
+    print(" Path does not exist!")
+    return None
+
+
+No path found.
+
+Helpers
+def get_neighbors(v):
+    return Graph_nodes.get(v, [])
+
+
+Return neighbor list for v from the global graph dictionary. If v not present, return empty list.
+
+def heuristic(n):
+    heuristic_dist = {
+        'A': 11,
+        'B': 6,
+        'C': 99,
+        'D': 1,
+        'E': 7,
+        'G': 0
+    }
+    return heuristic_dist.get(n, float('inf'))
+
+
+The heuristic h(n) is an estimate of the remaining cost to the goal. Here it’s a hardcoded lookup. Unlisted nodes default to ∞ (unreachable).
+
+Graph_nodes = {
+    'A': [('B', 2), ('E', 3)],
+    'B': [('C', 1), ('G', 9)],
+    'C': [],
+    'E': [('D', 6)],
+    'D': [('G', 1)],
+    'G': []
+}
+
+
+Directed weighted graph:
+
+A→B (2), A→E (3)
+
+B→C (1), B→G (9)
+
+E→D (6)
+
+D→G (1)
+
+print(" A* Search Algorithm Execution:")
+aStarAlgo('A', 'G')
+
+
+Runs A* from A to G and prints the result.
+
+Step-by-step run on your graph
+
+We’ll track f = g + h:
+
+Start:
+
+open = {A}, g(A)=0, h(A)=11, so f(A)=11
+
+Pick A.
+
+Expand A:
+
+Neighbors: B (cost 2), E (cost 3)
+
+Set g(B)=2, g(E)=3, parents B←A, E←A
+
+f(B)=2+6=8, f(E)=3+7=10
+
+open = {B, E}, closed = {A} → pick node with smallest f: B
+
+Expand B:
+
+Neighbors: C (cost +1), G (cost +9)
+
+g(C)=g(B)+1=2+1=3, g(G)=g(B)+9=2+9=11
+
+f(C)=3+99=102, f(G)=11+0=11
+
+open = {E (f=10), C (f=102), G (f=11)}, closed = {A, B} → pick E (f=10)
+
+Expand E:
+
+Neighbor: D (cost +6)
+
+g(D)=g(E)+6=3+6=9, f(D)=9+1=10, parent D←E
+
+open = {C (102), G (11), D (10)}, closed = {A, B, E} → pick D (f=10)
+
+Expand D:
+
+Neighbor: G (cost +1)
+
+New path to G: g_new = g(D)+1 = 9+1 = 10 which is better than old g(G)=11
+
+Update g(G)=10, parents[G]=D
+
+f(G)=10+0=10
+
+open = {C (102), G (10)}, closed = {A, B, E, D} → pick G (goal)
+
+Goal reached:
+
+Reconstruct path via parents: G ← D ← E ← A
+
+Path: A → E → D → G
+
+Total cost g(G) = 10
+
+Printed output:
+
+Path found: A → E → D → G
+Total cost (Σg): 10
+
+Notes & tips (practical/exam-ready)
+
+Heuristic admissibility: For A*, h(n) should not overestimate the true remaining cost. Your values look arbitrary (e.g., C: 99). That’s okay for a toy example, but in a graded context note: if a real path from C to G existed and had cost < 99, this heuristic would be inadmissible and could make A* non-optimal. (Here C can’t reach G, so it doesn’t affect optimality.)
+
+Data structures: Using a set is fine for small graphs. For performance, mention that a min-heap/priority queue keyed by f(n) is preferred.
+
+Tie-breaking: If two nodes have equal f, different tie-breaking can slightly change the search order (not the optimality under admissible h).
+
+Redundant check: The if n is None after selecting from a non-empty open_set won’t trigger in this code; it’s a harmless safeguard.
+
+Directed vs undirected: Your graph is directed (edges are one-way). That’s intentional here; make it explicit if you’re asked.
+
+If you want, I can refactor this to use a priority queue (heapq) and add comments about complexity — but the logic you’ve written is solid for explaining A* in an exam.

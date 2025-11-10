@@ -1,0 +1,403 @@
+# 18. Implementation an Email Spam Detection model using a Support Vector Machine (SVM) for
+# binary classification, where emails are categorized as Normal (Not Spam) or Abnormal (Spam).
+# Apply oversampling or undersampling techniques to handle class imbalance and analyze model
+# performance using appropriate evaluation metrics. 
+
+
+
+# Step 1: Import necessary libraries
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import confusion_matrix, classification_report, accuracy_score, precision_score, recall_score, f1_score
+from imblearn.over_sampling import SMOTE
+
+
+# Step 2: Load dataset
+data = pd.read_csv("emails_16_17_18_19.csv")
+
+# Drop unnecessary columns
+data = data.drop(['Email No.'], axis=1)
+
+# Inspect dataset
+print("Shape:", data.shape)
+print("\nClass Distribution:\n", data['Prediction'].value_counts())
+
+# Visualize initial class distribution
+sns.countplot(x='Prediction', hue='Prediction', data=data)
+plt.title("Class Distribution Before Sampling")
+plt.show()
+
+
+
+# Step 3: Split data into features and target
+X = data.drop('Prediction', axis=1)
+y = data['Prediction']
+
+# Split into train and test sets
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+print("Before Sampling:")
+print(y_train.value_counts())
+
+
+# Step 4: Apply SMOTE for oversampling minority class
+smote = SMOTE(random_state=42)
+X_train_bal, y_train_bal = smote.fit_resample(X_train, y_train)
+
+print("After SMOTE Oversampling:")
+print(y_train_bal.value_counts())
+
+# Visualize class distribution after SMOTE
+sns.countplot(x=y_train_bal, hue=y_train_bal)
+plt.title("Class Distribution After SMOTE Oversampling")
+plt.show()
+
+
+# Step 5: Standardize the data
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train_bal)
+X_test_scaled = scaler.transform(X_test)
+
+
+# Step 6: Convert labels for hinge loss
+y_train_bal_ = np.where(y_train_bal <= 0, -1, 1)
+y_test_ = np.where(y_test <= 0, -1, 1)
+
+
+# Step 7: Define SVM class (same structure and logic as Q19)
+
+class SVMfromScratch:
+    def __init__(self, learning_rate=0.001, lambda_param=0.01, n_iters=1000):
+        self.lr = learning_rate        # learning rate
+        self.lambda_param = lambda_param  # regularization (1/C)
+        self.n_iters = n_iters
+        self.w = None
+        self.b = None
+
+    def fit(self, X, y):
+        n_samples, n_features = X.shape
+        self.w = np.zeros(n_features)
+        self.b = 0
+
+        for _ in range(self.n_iters):
+            for idx, x_i in enumerate(X):
+                condition = y[idx] * (np.dot(x_i, self.w) - self.b) >= 1
+                if condition:
+                    # correctly classified → apply regularization only
+                    self.w -= self.lr * (2 * self.lambda_param * self.w)
+                else:
+                    # misclassified → apply hinge loss gradient
+                    self.w -= self.lr * (2 * self.lambda_param * self.w - np.dot(x_i, y[idx]))
+                    self.b -= self.lr * y[idx]
+
+    def decision_function(self, X):
+        return np.dot(X, self.w) + self.b
+        
+    def predict(self, X):
+        approx = np.dot(X, self.w) - self.b
+        return np.sign(approx)
+
+
+# Step 8: Train the model (same as 19)
+svm_model = SVMfromScratch(learning_rate=0.0001, lambda_param=0.01, n_iters=100)
+svm_model.fit(X_train_scaled, y_train_bal_)
+
+
+# Step 9: Prediction
+y_pred = svm_model.predict(X_test_scaled)
+
+# Convert {-1,1} back to {0,1}
+y_pred_final = np.where(y_pred == -1, 0, 1)
+
+
+# Step 10: Evaluation of performance
+print("----- Custom SVM (from scratch) Performance -----")
+acc = accuracy_score(y_test, y_pred_final) * 100
+prec = precision_score(y_test, y_pred_final) * 100
+rec = recall_score(y_test, y_pred_final) * 100
+f1 = f1_score(y_test, y_pred_final) * 100
+
+print(f"Accuracy : {acc:.2f}%")
+print(f"Precision: {prec:.2f}")
+print(f"Recall   : {rec:.2f}")
+print(f"F1-Score : {f1:.2f}")
+
+print("\nClassification Report:\n", classification_report(y_test, y_pred_final))
+print("\nConfusion Matrix:\n", confusion_matrix(y_test, y_pred_final))
+
+# Visualize Confusion Matrix
+sns.heatmap(confusion_matrix(y_test, y_pred_final), annot=True, fmt='d')
+plt.title("Confusion Matrix - SVM from Scratch (Email Spam Detection)")
+plt.xlabel("Predicted")
+plt.ylabel("Actual")
+plt.show()
+
+
+from sklearn.metrics import roc_auc_score, average_precision_score
+from sklearn.metrics import RocCurveDisplay, PrecisionRecallDisplay
+
+decision_scores = svm_model.decision_function(X_test_scaled)
+
+print("ROC-AUC:", roc_auc_score(y_test, decision_scores))
+print("PR-AUC (Average Precision):", average_precision_score(y_test, decision_scores))
+
+RocCurveDisplay.from_predictions(y_test, decision_scores)
+plt.title("ROC Curve - SVM from Scratch")
+plt.show()
+
+PrecisionRecallDisplay.from_predictions(y_test, decision_scores)
+plt.title("Precision-Recall Curve - SVM from Scratch")
+plt.show()
+
+from sklearn.metrics import precision_score, recall_score, f1_score
+
+acc = accuracy_score(y_test, y_pred_final)
+prec = precision_score(y_test, y_pred_final)
+rec = recall_score(y_test, y_pred_final)
+f1 = f1_score(y_test, y_pred_final)
+
+
+print(f"Accuracy: {acc:.4f}")
+print(f"Precision: {prec:.4f}")
+print(f"Recall: {rec:.4f}")
+print(f"F1-score: {f1:.4f}")
+print(f"ROC-AUC: {roc:.4f}")
+
+
+19. Implement an Email Spam Detection model from scratch using the Support Vector Machine
+(SVM) algorithm for binary classification, where emails are labeled as Normal (Not Spam) or
+Abnormal (Spam). Analyze model performance using appropriate evaluation metrics.
+
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+from sklearn.preprocessing import StandardScaler
+
+
+# Load dataset
+data = pd.read_csv("emails.csv")
+
+# Drop unused columns
+data = data.drop(['Email No.'], axis=1)
+
+# Separate features and target
+X = data.drop('Prediction', axis=1).values
+y = data['Prediction'].values
+
+# Convert labels: 0 → -1 (for SVM math), 1 → 1
+y = np.where(y == 0, -1, 1)
+
+# Train-test split
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+# Scale features for better convergence
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
+
+
+class SVMfromScratch:
+    def __init__(self, learning_rate=0.001, lambda_param=0.01, n_iters=1000):
+        self.lr = learning_rate        # learning rate
+        self.lambda_param = lambda_param  # regularization (1/C)
+        self.n_iters = n_iters
+        self.w = None
+        self.b = None
+
+    def fit(self, X, y):
+        n_samples, n_features = X.shape
+        self.w = np.zeros(n_features)
+        self.b = 0
+
+        for _ in range(self.n_iters):
+            for idx, x_i in enumerate(X):
+                condition = y[idx] * (np.dot(x_i, self.w) - self.b) >= 1
+                if condition:
+                    # correctly classified
+                    self.w -= self.lr * (2 * self.lambda_param * self.w)
+                else:
+                    # misclassified → apply hinge loss gradient
+                    self.w -= self.lr * (2 * self.lambda_param * self.w - np.dot(x_i, y[idx]))
+                    self.b -= self.lr * y[idx]
+
+    def predict(self, X):
+        approx = np.dot(X, self.w) - self.b
+        return np.sign(approx)
+
+
+# Initialize and train custom SVM
+svm = SVMfromScratch(learning_rate=0.001, lambda_param=0.01, n_iters=1000)
+svm.fit(X_train, y_train)
+
+# Predictions
+y_pred = svm.predict(X_test)
+
+# Convert back -1 → 0 for evaluation display
+y_test_eval = np.where(y_test == -1, 0, 1)
+y_pred_eval = np.where(y_pred == -1, 0, 1)
+
+
+acc = accuracy_score(y_test_eval, y_pred_eval)
+cm = confusion_matrix(y_test_eval, y_pred_eval)
+cr = classification_report(y_test_eval, y_pred_eval)
+
+print(f"Accuracy: {acc*100:.2f}%\n")
+print("Confusion Matrix:\n", cm)
+print("\nClassification Report:\n", cr)
+
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+plt.figure(figsize=(5,4))
+sns.heatmap(cm, annot=True, fmt='d', cmap='Greens')
+plt.title("Confusion Matrix (SVM From Scratch)")
+plt.xlabel("Predicted")
+plt.ylabel("Actual")
+plt.show()
+
+
+
+
+21. Develop an SVM classifier from scratch using a Polynomial Kernel on the Breast Cancer
+Wisconsin Dataset to distinguish between benign and malignant tumors.
+Evaluate the classifier using a confusion matrix and ROC curve to analyze diagnostic accuracy. 
+
+# -------------------------------------------------------
+# Step 1: Import Required Libraries
+# -------------------------------------------------------
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import confusion_matrix, roc_curve, auc
+import matplotlib.pyplot as plt
+
+
+# -------------------------------------------------------
+# Step 2: Load and Preprocess the Breast Cancer Dataset
+# -------------------------------------------------------
+# Load dataset (update filename if different)
+data = pd.read_csv("brca.csv")
+
+# Drop unnecessary columns like ID or Unnamed
+data = data.drop(columns=['Unnamed: 0'], errors='ignore')
+
+# Encode target variable: Malignant = 1, Benign = 0
+data['y'] = data['y'].map({'M': 1, 'B': 0})
+
+# Split features and target
+X = data.drop(columns=['y']).values
+y = data['y'].values
+
+# Normalize features for better numerical stability
+scaler = StandardScaler()
+X = scaler.fit_transform(X)
+
+# Split dataset into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+print("✅ Data Loaded Successfully!")
+print("Training Samples:", X_train.shape[0])
+print("Testing Samples:", X_test.shape[0])
+
+
+# -------------------------------------------------------
+# Step 3: Define Polynomial Kernel
+# -------------------------------------------------------
+def polynomial_kernel(X1, X2, degree=3, c=1):
+    """
+    Computes the polynomial kernel between X1 and X2
+    K(x, y) = (x · y + c)^degree
+    """
+    return (np.dot(X1, X2.T) + c) ** degree
+
+
+# -------------------------------------------------------
+# Step 4: Define SVM Class with Polynomial Kernel (From Scratch)
+# -------------------------------------------------------
+class SVMPolynomial:
+    def __init__(self, learning_rate=0.001, lambda_param=0.01, n_iters=1000, degree=2, c=1):
+        self.lr = learning_rate
+        self.lambda_param = lambda_param
+        self.n_iters = n_iters
+        self.degree = degree
+        self.c = c
+
+    def fit(self, X, y):
+        n_samples, n_features = X.shape
+        y_ = np.where(y <= 0, -1, 1)  # convert 0 → -1
+        self.alpha = np.zeros(n_samples)
+        self.K = polynomial_kernel(X, X, self.degree, self.c)
+
+        for _ in range(self.n_iters):
+            for i in range(n_samples):
+                condition = y_[i] * (np.sum(self.alpha * y_ * self.K[:, i])) >= 1
+                if condition:
+                    self.alpha[i] -= self.lr * (2 * self.lambda_param * self.alpha[i])
+                else:
+                    self.alpha[i] += self.lr * (1 - y_[i] * np.sum(self.alpha * y_ * self.K[:, i]))
+
+        self.X_train = X
+        self.y_train = y_
+
+    def project(self, X):
+        K = polynomial_kernel(X, self.X_train, self.degree, self.c)
+        return np.dot(K, self.alpha * self.y_train)
+
+    def predict(self, X):
+        pred = self.project(X)
+        return np.sign(pred)
+
+
+# -------------------------------------------------------
+# Step 5: Train SVM Model using Polynomial Kernel
+# -------------------------------------------------------
+svm_poly = SVMPolynomial(learning_rate=0.001, lambda_param=0.01, n_iters=1000, degree=2, c=1)
+svm_poly.fit(X_train, y_train)
+y_pred = svm_poly.predict(X_test)
+
+# Convert {-1, 1} → {0, 1}
+y_pred = np.where(y_pred == -1, 0, 1)
+
+print("✅ Model training completed successfully!")
+
+
+# -------------------------------------------------------
+# Step 6: Evaluate Model Accuracy
+# -------------------------------------------------------
+
+# Confusion Matrix
+cm = confusion_matrix(y_test, y_pred)
+print("Confusion Matrix:\n", cm)
+
+# ROC Curve
+fpr, tpr, _ = roc_curve(y_test, y_pred)
+roc_auc = auc(fpr, tpr)
+
+plt.figure(figsize=(6, 5))
+plt.plot(fpr, tpr, color='blue', lw=2, label=f'Polynomial Kernel SVM (AUC = {roc_auc:.2f})')
+plt.plot([0, 1], [0, 1], color='red', linestyle='--')
+plt.title('ROC Curve - Polynomial Kernel SVM (From Scratch)')
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.legend(loc='lower right')
+plt.grid(True)
+plt.show()
+
+
+# -------------------------------------------------------
+# Step 7: Display Accuracy
+# -------------------------------------------------------
+accuracy = np.mean(y_pred == y_test) * 100
+print(f"Model Accuracy: {accuracy:.2f}%")

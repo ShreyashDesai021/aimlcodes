@@ -1,0 +1,151 @@
+# -------------------------------------------------------
+# Block 0: Imports & Global Settings
+# -------------------------------------------------------
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+from math import sqrt
+
+# Plot defaults (kept simple to align with reference style)
+plt.rcParams['figure.figsize'] = (6, 4)
+plt.rcParams['axes.grid'] = True
+
+
+
+# -------------------------------------------------------
+# Block 1: Load Data
+# -------------------------------------------------------
+# Update path if required for your environment
+file_path = "Salary Data 14.xlsx"
+df = pd.read_excel(file_path)
+
+print("Shape:", df.shape)
+df.head()
+
+
+
+# -------------------------------------------------------
+# Block 2.1: Handle Missing Values (Future-proof: no chained assignment)
+# -------------------------------------------------------
+print("Missing values BEFORE:\n", df.isnull().sum())
+for c in df.columns:
+    if df[c].dtype == 'O':
+        df[c] = df[c].fillna(df[c].mode()[0])
+    else:
+        df[c] = df[c].fillna(df[c].mean())
+print("\nMissing values AFTER:\n", df.isnull().sum())
+
+
+
+# -------------------------------------------------------
+# Block 2.2: One-Hot Encoding (Gender, Education Level, Job Title)
+# -------------------------------------------------------
+categorical_cols = [c for c in ['Gender','Education Level','Job Title'] if c in df.columns]
+df_enc = pd.get_dummies(df, columns=categorical_cols, drop_first=True)
+
+# Define features and target
+X = df_enc.drop(columns=['Salary'])
+y = df_enc['Salary']
+
+print("Feature count:", X.shape[1])
+print("Feature names:", list(X.columns)[:10], "...")
+
+
+
+# -------------------------------------------------------
+# Block 2.3: Feature Scaling (ONE-LINE normalization for stability)
+# -------------------------------------------------------
+X = pd.DataFrame(StandardScaler().fit_transform(X), columns=X.columns)
+X.head()
+
+
+
+# -------------------------------------------------------
+# Block 3: Manual 5-Fold CV — Shuffle indices, split folds, train & evaluate
+# -------------------------------------------------------
+k = 5
+n = len(X)
+
+# Shuffle indices
+rng = np.random.RandomState(42)
+idx = np.arange(n)
+rng.shuffle(idx)
+
+# Compute fold sizes
+fold_sizes = np.full(k, n // k, dtype=int)
+fold_sizes[: n % k] += 1
+
+# Iterate folds
+r2_scores, rmse_scores, mae_scores = [], [], []
+start = 0
+for fold, fs in enumerate(fold_sizes, start=1):
+    test_idx = idx[start:start+fs]
+    train_idx = np.setdiff1d(idx, test_idx)
+    start += fs
+
+    X_tr, X_te = X.iloc[train_idx], X.iloc[test_idx]
+    y_tr, y_te = y.iloc[train_idx], y.iloc[test_idx]
+
+    # Model: Linear Regression
+    model = LinearRegression()
+    model.fit(X_tr, y_tr)
+    y_pred = model.predict(X_te)
+
+    # Metrics
+    r2 = r2_score(y_te, y_pred)
+    rmse = sqrt(mean_squared_error(y_te, y_pred))
+    mae = mean_absolute_error(y_te, y_pred)
+
+    r2_scores.append(r2); rmse_scores.append(rmse); mae_scores.append(mae)
+    print(f"Fold {fold}: R^2={r2:.4f} | RMSE={rmse:.2f} | MAE={mae:.2f}")
+
+# Averages across folds
+print("\nCV Averages:")
+print(f"R^2 mean = {np.mean(r2_scores):.4f}")
+print(f"RMSE mean = {np.mean(rmse_scores):.2f}")
+print(f"MAE mean  = {np.mean(mae_scores):.2f}")
+
+
+
+# -------------------------------------------------------
+# Block 4: Plot R^2 across 5 folds
+# -------------------------------------------------------
+plt.figure()
+plt.plot(range(1, k+1), r2_scores, marker='o')
+plt.title("R^2 Across 5 Folds")
+plt.xlabel("Fold")
+plt.ylabel("R^2")
+plt.show()
+
+
+
+# -------------------------------------------------------
+# Block 5: Final Model — Fit on ALL data and evaluate
+# -------------------------------------------------------
+final_model = LinearRegression()
+final_model.fit(X, y)
+y_pred_full = final_model.predict(X)
+
+r2_full  = r2_score(y, y_pred_full)
+rmse_full = sqrt(mean_squared_error(y, y_pred_full))
+mae_full  = mean_absolute_error(y, y_pred_full)
+
+print("Final Model (Full Data):")
+print(f"R^2 = {r2_full:.4f} | RMSE = {rmse_full:.2f} | MAE = {mae_full:.2f}")
+
+
+
+# -------------------------------------------------------
+# Block 6: Predicted vs Actual plot
+# -------------------------------------------------------
+plt.figure()
+plt.scatter(y, y_pred_full, alpha=0.6)
+plt.title("Predicted vs Actual Salary (Full Model)")
+plt.plot(y, np.poly1d(np.polyfit(y, y_pred_full, 1))(y), color='red')
+plt.xlabel("Actual Salary")
+plt.ylabel("Predicted Salary")
+plt.show()

@@ -1,0 +1,193 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import (
+    confusion_matrix, accuracy_score, precision_score, recall_score, f1_score, classification_report
+)
+
+
+
+# Make sure the CSV is in the same directory or update the path accordingly.
+data = pd.read_csv("emails_16_17_18_19.csv")
+print("Shape:", data.shape)
+display(data.head())
+
+
+
+# Features: all word-count columns. Target: Prediction (0 = Not Spam, 1 = Spam)
+X_df = data.drop(columns=["Email No.", "Prediction"])  # drop ID and target from features
+y_series = data["Prediction"].astype(int)
+
+# Ensure numeric and fill missing values
+X_df = X_df.apply(pd.to_numeric, errors="coerce").fillna(0).astype(int)
+
+
+
+plt.figure(figsize=(4,3))
+y_series.value_counts().sort_index().plot(kind='bar', color=['skyblue', 'salmon'])
+plt.title('Class Distribution: Not Spam (0) vs Spam (1)')
+plt.xticks([0,1])
+plt.ylabel('Number of Emails')
+plt.show()
+
+
+
+email_length = X_df.sum(axis=1)
+plt.figure(figsize=(6,4))
+plt.hist(email_length[y_series==0], bins=40, alpha=0.6, color='skyblue', label='Not Spam')
+plt.hist(email_length[y_series==1], bins=40, alpha=0.6, color='salmon', label='Spam')
+plt.title('Email Length Distribution (Total Word Count per Email)')
+plt.xlabel('Total Word Count')
+plt.ylabel('Number of Emails')
+plt.legend()
+plt.show()
+
+
+
+try:
+    import seaborn as sns
+    plt.figure(figsize=(6,4))
+    sns.kdeplot(email_length[y_series==0], label='Not Spam', fill=True)
+    sns.kdeplot(email_length[y_series==1], label='Spam', fill=True)
+    plt.title('Email Length Density (KDE)')
+    plt.xlabel('Total Word Count')
+    plt.ylabel('Density')
+    plt.legend()
+    plt.show()
+except Exception:
+    pass
+
+
+
+top_words = X_df.mean().sort_values(ascending=False).head(10)
+plt.figure(figsize=(6,3))
+top_words.plot(kind='bar', color='lightgreen')
+plt.title('Top 10 Most Frequent Words (Avg Count)')
+plt.ylabel('Average Count per Email')
+plt.show()
+
+
+
+X = X_df.to_numpy()
+y = y_series.to_numpy()
+
+
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+print(f"Train: {X_train.shape}, Test: {X_test.shape}")
+
+
+
+# We model: log P(c) + sum_j x_j * log P(feature_j | c)
+# with Laplace smoothing (alpha = 1) for stability.
+
+def train_naive_bayes(X_train, y_train, alpha=1):
+    classes = np.unique(y_train)
+    priors = {}
+    cond_probs = {}
+
+    for c in classes:
+        X_c = X_train[y_train == c]
+        priors[c] = len(X_c) / len(X_train)                 # P(c)
+        feature_sum = X_c.sum(axis=0) + alpha               # add-one smoothing
+        total_sum = feature_sum.sum()
+        cond_probs[c] = feature_sum / total_sum             # P(feature|c)
+
+    return classes, priors, cond_probs
+
+
+def predict_naive_bayes(X_test, classes, priors, cond_probs):
+    preds = []
+    log_priors = {c: np.log(priors[c]) for c in classes}
+    log_cond = {c: np.log(cond_probs[c]) for c in classes}
+
+    for x in X_test:
+        scores = {c: log_priors[c] + np.sum(x * log_cond[c]) for c in classes}
+        preds.append(max(scores, key=scores.get))
+    return np.array(preds)
+
+# Train + Predict
+classes, priors, cond_probs = train_naive_bayes(X_train, y_train, alpha=1)
+y_pred = predict_naive_bayes(X_test, classes, priors, cond_probs)
+
+
+
+cm = confusion_matrix(y_test, y_pred)
+accuracy = accuracy_score(y_test, y_pred)
+precision = precision_score(y_test, y_pred, zero_division=0)
+recall = recall_score(y_test, y_pred, zero_division=0)
+f1 = f1_score(y_test, y_pred, zero_division=0)
+
+print("Confusion Matrix:\n", cm)
+print("\n--- Performance Metrics ---")
+print(f"Accuracy : {accuracy:.4f}")
+print(f"Precision: {precision:.4f}")
+print(f"Recall   : {recall:.4f}")
+print(f"F1-Score : {f1:.4f}")
+
+print("\n--- Classification Report ---")
+print(classification_report(y_test, y_pred, target_names=["Not Spam","Spam"], zero_division=0))
+
+
+TP = np.sum((y_test == 1) & (y_pred == 1))
+TN = np.sum((y_test == 0) & (y_pred == 0))
+FP = np.sum((y_test == 0) & (y_pred == 1))
+FN = np.sum((y_test == 1) & (y_pred == 0))
+
+print("Confusion Matrix (from scratch):")
+conf_matrix = np.array([[TN, FP],
+                        [FN, TP]], dtype=int)
+print(conf_matrix)
+
+# -------------------------------
+# Step 8: Metrics (from scratch)
+# -------------------------------
+total = TP + TN + FP + FN
+accuracy  = (TP + TN) / total if total else 0.0
+precision = TP / (TP + FP) if (TP + FP) else 0.0
+recall    = TP / (TP + FN) if (TP + FN) else 0.0
+f1        = 2 * precision * recall / (precision + recall) if (precision + recall) else 0.0
+
+print("\n--- Performance Metrics ---")
+print(f"\nAccuracy : {accuracy:.4f}")
+print(f"Precision: {precision:.4f}")
+print(f"Recall   : {recall:.4f}")
+print(f"F1-Score : {f1:.4f}")
+
+print("\n--- Classification Report ---")
+print(classification_report(y_test, y_pred, target_names=["Not Spam","Spam"], zero_division=0))
+
+
+plt.figure(figsize=(4,3))
+plt.imshow(cm)
+plt.title('Confusion Matrix')
+plt.xlabel('Predicted')
+plt.ylabel('Actual')
+plt.xticks([0,1], ['Not Spam', 'Spam'])
+plt.yticks([0,1], ['Not Spam', 'Spam'])
+for i in range(2):
+    for j in range(2):
+        plt.text(j, i, cm[i, j], ha='center', va='center')
+plt.show()
+
+
+# -----------------------------------------------------
+# 11) Predict on Example Messages (Demo Only)
+# -----------------------------------------------------
+
+# Two example messages (fake text for demonstration)
+new_messages = [
+    "You’ve been selected for a free vacation trip to Maldives! Reply YES to claim your prize now.",  
+    "Hey, don't forget to send me the project report before tonight.",  
+]
+
+# NOTE: This dataset is numeric (word counts), so we can’t directly predict text.
+# Instead, let's just simulate what we *would* display.
+fake_predictions = ["Spam", "Not Spam"]
+
+for msg, pred in zip(new_messages, fake_predictions):
+    print("\nMessage:", msg)
+    print("Prediction:", pred)

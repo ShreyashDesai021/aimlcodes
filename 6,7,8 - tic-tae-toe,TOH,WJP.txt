@@ -1,0 +1,254 @@
+6. Implementation of Tic-Tac-Toe game. 
+Code:
+# TIC-TAC-TOE GAME (2 Player Console Version)
+
+
+# Function to print the board
+def print_board(board):
+    print("\n")
+    print(f"{board[0]} | {board[1]} | {board[2]}")
+    print("--+---+--")
+    print(f"{board[3]} | {board[4]} | {board[5]}")
+    print("--+---+--")
+    print(f"{board[6]} | {board[7]} | {board[8]}")
+    print("\n")
+
+
+# Function to check if a player has won
+def check_winner(board, player):
+    # All possible winning combinations
+    win_conditions = [
+        (0, 1, 2), (3, 4, 5), (6, 7, 8),  # Rows
+        (0, 3, 6), (1, 4, 7), (2, 5, 8),  # Columns
+        (0, 4, 8), (2, 4, 6)              # Diagonals
+    ]
+    for a, b, c in win_conditions:
+        if board[a] == board[b] == board[c] == player:
+            return True
+    return False
+
+
+# Function to check for a draw
+def check_draw(board):
+    return all(cell != " " for cell in board)
+
+
+# Main function for the game
+def tic_tac_toe():
+    board = [" "] * 9  # Empty board
+    current_player = "X"  # Player X starts first
+
+
+    print("Welcome to Tic-Tac-Toe Game!")
+    print_board(board)
+
+
+    while True:
+        try:
+            move = int(input(f"Player {current_player}, enter your move (1-9): ")) - 1
+
+
+            # Validate move
+            if move < 0 or move > 8 or board[move] != " ":
+                print("Invalid move! Try again.")
+                continue
+
+
+            # Make the move
+            board[move] = current_player
+            print_board(board)
+
+
+            # Check for winner
+            if check_winner(board, current_player):
+                print(f"Player {current_player} wins!")
+                break
+
+
+            # Check for draw
+            if check_draw(board):
+                print("It's a Draw!")
+                break
+
+
+            # Switch player
+            current_player = "O" if current_player == "X" else "X"
+
+
+        except ValueError:
+            print("Please enter a valid number between 1 and 9.")
+
+
+# Run the game
+tic_tac_toe()
+
+
+
+7. Implementation of Tower of Hanoi game.
+Code:
+# TOWER OF HANOI (Simple Recursive Version)
+
+
+# Formula:
+#   Minimum number of moves = 2^n - 1
+# where n = number of disks
+
+
+def tower_of_hanoi(n, source, auxiliary, destination):
+    # Base case: only one disk
+    if n == 1:
+        print(f"Move disk 1 from {source} → {destination}")
+        return
+
+
+    # Step 1: Move (n-1) disks from source → auxiliary
+    tower_of_hanoi(n - 1, source, destination, auxiliary)
+
+
+    # Step 2: Move the largest disk from source → destination
+    print(f"Move disk {n} from {source} → {destination}")
+
+
+    # Step 3: Move (n-1) disks from auxiliary → destination
+    tower_of_hanoi(n - 1, auxiliary, source, destination)
+
+
+# USER INPUT SECTION
+print("Tower of Hanoi Problem\n")
+n = int(input("Enter number of disks: "))
+
+
+print(f"\nSteps to solve Tower of Hanoi with {n} disks:\n")
+tower_of_hanoi(n, 'A', 'B', 'C')
+
+
+# Total moves formula
+print(f"\nTotal moves required = {2**n - 1}")
+
+
+'''
+Enter number of disks: 3
+
+
+Steps to solve Tower of Hanoi with 3 disks:
+
+
+Move disk 1 from A → C
+Move disk 2 from A → B
+Move disk 1 from C → B
+Move disk 3 from A → C
+Move disk 1 from B → A
+Move disk 2 from B → C
+Move disk 1 from A → C
+
+
+Total moves required = 7
+'''
+
+
+8. Implementation of Water jug problems. 
+Code:
+# WATER JUG PROBLEM using BFS
+
+
+# Aim: Measure the exact target amount using two jugs of given capacities
+
+
+from collections import deque
+
+
+def water_jug_problem(jug1_capacity, jug2_capacity, target):
+    # To store visited states
+    visited = set()
+    queue = deque([(0, 0)])  # (jug1, jug2)
+
+
+    print(f"\n Steps to get {target} liters:")
+
+
+    while queue:
+        (jug1, jug2) = queue.popleft()
+
+
+        # Skip already visited states
+        if (jug1, jug2) in visited:
+            continue
+        visited.add((jug1, jug2))
+
+
+        print(f"({jug1}, {jug2})")  # current state
+
+
+        # Goal test
+        if jug1 == target or jug2 == target:
+            print(f"\nTarget achieved! ({jug1}, {jug2})")
+            return True
+
+
+        # Generate all possible next states
+        next_states = [
+            (jug1_capacity, jug2),             # Fill jug1
+            (jug1, jug2_capacity),             # Fill jug2
+            (0, jug2),                         # Empty jug1
+            (jug1, 0),                         # Empty jug2
+            # Pour jug1 → jug2
+            (jug1 - min(jug1, jug2_capacity - jug2), jug2 + min(jug1, jug2_capacity - jug2)),
+            # Pour jug2 → jug1
+            (jug1 + min(jug2, jug1_capacity - jug1), jug2 - min(jug2, jug1_capacity - jug1))
+        ]
+
+
+        # Add next states to the queue
+        for state in next_states:
+            if state not in visited:
+                queue.append(state)
+
+
+    print("\nNo solution found.")
+    return False
+
+
+# USER INPUT SECTION
+print("WATER JUG PROBLEM\n")
+
+
+jug1 = int(input("Enter capacity of Jug 1: "))
+jug2 = int(input("Enter capacity of Jug 2: "))
+target = int(input("Enter target amount to measure: "))
+
+
+# Run the BFS solution
+water_jug_problem(jug1, jug2, target)
+
+
+'''
+WATER JUG PROBLEM
+
+
+Enter capacity of Jug 1: 4
+Enter capacity of Jug 2: 7
+Enter target amount to measure: 5
+
+
+ Steps to get 5 liters:
+(0, 0)
+(4, 0)
+(0, 7)
+(4, 7)
+(0, 4)
+(4, 3)
+(4, 4)
+(0, 3)
+(1, 7)
+(3, 0)
+(1, 0)
+(3, 7)
+(0, 1)
+(4, 6)
+(4, 1)
+(0, 6)
+(0, 5)
+
+
+Target achieved! (0, 5)
+'''

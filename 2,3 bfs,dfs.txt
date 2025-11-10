@@ -1,0 +1,343 @@
+
+2. Design an algorithm using Breadth-First Search (BFS) to find the shortest path from a start node to a goal node in a maze represented as a grid graph. The maze contains obstacles (walls) and free cells. Implement BFS to ensure that the first found path is the optimal one in terms of the number of steps. 
+Code:
+from collections import deque
+
+
+# Breadth-First Search (BFS) Algorithm
+# Formula / Core Idea:
+# f(n) = g(n)
+# → where g(n) = number of steps (cost from start node to current node)
+# Since all edges have equal cost, BFS always finds the shortest path first.
+
+
+def bfs_shortest_path(maze, start, goal):
+    rows, cols = len(maze), len(maze[0])
+
+
+    # 4 possible movement directions → up, down, left, right
+    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)] # 
+
+
+    # Queue holds tuples of (current_position, path_travelled)
+    queue = deque([(start, [start])])
+
+
+    # Keep track of visited cells to avoid revisiting
+    visited = set([start])
+
+
+    while queue:
+        (x, y), path = queue.popleft()  # FIFO → ensures level-wise traversal
+
+
+        # Step 1: Goal test
+        if (x, y) == goal:
+            print("\n Path found!")
+            print("Path:", path)
+            print("Number of steps:", len(path) - 1)
+            return path
+
+
+        # Step 2: Explore all 4 possible directions
+        for dx, dy in directions:
+            nx, ny = x + dx, y + dy  # new coordinates
+
+
+            # Step 3: Boundary & obstacle checks
+            if (
+                0 <= nx < rows and
+                0 <= ny < cols and
+                maze[nx][ny] == 0 and
+                (nx, ny) not in visited
+            ):
+                visited.add((nx, ny))  # mark visited
+                queue.append(((nx, ny), path + [(nx, ny)]))  # enqueue next position
+
+
+    # Step 4: If queue is empty, no path exists
+    print(" No path found.")
+    return None
+
+
+# Example Maze (0 = Free cell, 1 = Wall)
+maze = [
+    [0, 1, 0, 0, 0],
+    [0, 1, 0, 1, 0],
+    [0, 0, 0, 1, 0],
+    [0, 1, 1, 0, 0],
+    [0, 0, 0, 0, 0]
+]
+
+
+# Start and Goal positions (row, column)
+start = (0, 0)
+goal = (4, 4)
+
+
+# Run BFS
+print(" BFS Traversal in Maze:")
+bfs_shortest_path(maze, start, goal)
+
+
+
+User Input:
+from collections import deque
+
+
+# Breadth-First Search (BFS) Algorithm
+
+
+# Formula / Core Idea:
+# f(n) = g(n)
+# where:
+#   g(n) → number of steps (cost from start node to current node)
+# Since all edges have equal cost, BFS ensures the first found path
+# is always the shortest one.
+
+
+def bfs_shortest_path(maze, start, goal):
+    rows, cols = len(maze), len(maze[0])
+
+
+    # 4 possible movement directions → up, down, left, right
+    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+
+
+    # Queue holds tuples of (current_position, path_travelled)
+    queue = deque([(start, [start])])
+
+
+    # Keep track of visited cells to avoid revisiting
+    visited = set([start])
+
+
+    while queue:
+        (x, y), path = queue.popleft()  # FIFO → ensures level-wise traversal
+
+
+        # Step 1: Goal test
+        if (x, y) == goal:
+            print("\n Path found!")
+            print("Path:", path)
+            print("Number of steps:", len(path) - 1)
+            return path
+
+
+        # Step 2: Explore all 4 possible directions
+        for dx, dy in directions:
+            nx, ny = x + dx, y + dy  # new coordinates
+
+
+            # Step 3: Boundary & obstacle checks
+            if (
+                0 <= nx < rows and
+                0 <= ny < cols and
+                maze[nx][ny] == 0 and
+                (nx, ny) not in visited
+            ):
+                visited.add((nx, ny))  # mark visited
+                queue.append(((nx, ny), path + [(nx, ny)]))  # enqueue next position
+
+
+    # Step 4: If queue is empty, no path exists
+    print("\n No path found.")
+    return None
+
+
+# USER INPUT SECTION
+
+
+print(" BFS Shortest Path Finder in Maze\n")
+
+
+# Step 1: Get maze dimensions
+rows = int(input("Enter number of rows in maze: "))
+cols = int(input("Enter number of columns in maze: "))
+
+
+# Step 2: Build maze grid
+maze = []
+print("\nEnter the maze layout (0 = free, 1 = wall):")
+for i in range(rows):
+    row = list(map(int, input(f"  Row {i+1}: ").split()))
+    if len(row) != cols:
+        print(" Error: Each row must have exactly", cols, "values.")
+        exit()
+    maze.append(row)
+
+
+# Step 3: Get start and goal positions
+print("\nEnter start and goal positions as row col (0-indexed):")
+start = tuple(map(int, input("Start position: ").split()))
+goal = tuple(map(int, input("Goal position: ").split()))
+
+
+# Step 4: Run BFS
+print("\n Running BFS...")
+bfs_shortest_path(maze, start, goal)
+
+
+
+
+#User Input
+#Enter number of rows in maze: 5
+#Enter number of columns in maze: 5
+
+
+#Enter the maze layout (0 = free, 1 = wall):
+# Row 1: 0 1 0 0 0
+#  Row 2: 0 1 0 1 0
+#  Row 3: 0 0 0 1 0
+#  Row 4: 0 1 1 0 0
+#  Row 5: 0 0 0 0 0
+
+
+#Enter start and goal positions as row col (0-indexed):
+#Start position: 0 0
+#Goal position: 4 4
+
+3. Implement a Depth-First Search (DFS) algorithm to traverse a tree or graph representing a game map. The goal is to explore all possible paths from the starting node to the target location, marking visited nodes to avoid cycles, and visualize the order of traversal. 
+COde:
+# Depth-First Search (DFS) Algorithm
+# Formula / Core Idea:
+# f(n) = expand deepest unvisited node first (LIFO order)
+# Uses recursion or stack to explore paths as deep as possible,
+# then backtracks when no further nodes are available.
+
+
+def dfs(graph, start, goal, visited=None, path=None):
+    if visited is None:
+        visited = set()   # To mark visited nodes (avoid cycles)
+    if path is None:
+        path = []         # To keep track of current traversal path
+
+
+    # Step 1: Mark current node as visited
+    visited.add(start)
+    path.append(start)
+
+
+    # Step 2: Visualization (show traversal order)
+    print("Visiting:", start)
+
+
+    # Step 3: Goal test condition
+    if start == goal:
+        print("\n Goal '{}' reached!".format(goal))
+        print("Path:", " → ".join(path))
+        return True
+
+
+    # Step 4: Explore each neighbor recursively
+    for neighbor in graph.get(start, []):
+        if neighbor not in visited:
+            if dfs(graph, neighbor, goal, visited, path):
+                return True
+
+
+    # Step 5: Backtrack when no more neighbors
+    path.pop()
+    return False
+
+
+# Example Graph (Game Map)
+# Graph structure:
+#     A
+#    / \
+#   B   C
+#  / \   \
+# D   E   F
+
+
+game_map = {
+    'A': ['B', 'C'],
+    'B': ['D', 'E'],
+    'C': ['F'],
+    'D': [],
+    'E': [],
+    'F': []
+}
+
+
+# Run DFS Traversal
+start_node = 'A'
+goal_node = 'F'
+
+
+print(" DFS Traversal of Game Map:")
+dfs(game_map, start_node, goal_node)
+
+
+User INput:
+# Depth-First Search (DFS) Algorithm
+
+
+# Formula / Core Idea:
+# f(n) = expand deepest unvisited node first  (LIFO order)
+# Uses recursion or stack to explore paths as deep as possible,
+# then backtracks when no further nodes are available.
+
+
+def dfs(graph, start, goal, visited=None, path=None):
+    if visited is None:
+        visited = set()   # To mark visited nodes (avoid cycles)
+    if path is None:
+        path = []         # To keep track of current traversal path
+
+
+    # Step 1: Mark current node as visited
+    visited.add(start)
+    path.append(start)
+
+
+    # Step 2: Visualization (show traversal order)
+    print("Visiting:", start)
+
+
+    # Step 3: Goal test condition
+    if start == goal:
+        print("\n Goal '{}' reached!".format(goal))
+        print("Path:", " → ".join(path))
+        return True
+
+
+    # Step 4: Explore each neighbor recursively (Depth-first)
+    for neighbor in graph.get(start, []):
+        if neighbor not in visited:
+            if dfs(graph, neighbor, goal, visited, path):
+                return True
+
+
+    # Step 5: Backtrack when no more neighbors
+    path.pop()
+    return False
+
+
+# USER INPUT SECTION
+print(" Depth-First Search (DFS) Traversal - User Input Version\n")
+
+
+# Step 1: Get number of nodes
+num_nodes = int(input("Enter the number of nodes in the graph: "))
+
+
+graph = {}
+
+
+# Step 2: Input adjacency list for each node
+for i in range(num_nodes):
+    node = input(f"\nEnter node name {i+1}: ").strip().upper()
+    neighbors = input(f"Enter neighbors of {node} (separated by spaces, or leave blank if none): ").strip().upper().split()
+    graph[node] = neighbors
+
+
+# Step 3: Input start and goal nodes
+start_node = input("\nEnter START node: ").strip().upper()
+goal_node = input("Enter GOAL node: ").strip().upper()
+
+
+# Run DFS Traversal
+print("\n DFS Traversal of User-Defined Graph:")
+dfs(graph, start_node, goal_node)
+

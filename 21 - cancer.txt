@@ -1,0 +1,265 @@
+# -------------------------------------------------------
+# Block 1: Imports & global config
+# -------------------------------------------------------
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import (
+    confusion_matrix, roc_curve, auc,
+    classification_report, accuracy_score,
+    precision_score, recall_score, f1_score
+)
+
+# Reproducibility
+RANDOM_STATE = 42
+np.random.seed(RANDOM_STATE)
+
+data = pd.read_csv("C:/Users/dshre/Downloads/Breast Cancer Wisconsin (Diagnostic)_21.csv")
+print(data.columns)
+data.head()
+
+# -------------------------------------------------------
+# Block 2: Load & preprocess dataset (NO leakage)
+# -------------------------------------------------------
+data = pd.read_csv("C:/Users/dshre/Downloads/Breast Cancer Wisconsin (Diagnostic)_21.csv")
+
+# Drop obvious non-feature columns if present
+data = data.drop(columns=['id', 'Unnamed: 0'], errors='ignore')
+
+# Auto-detect target column (prefers 'diagnosis' if present)
+target_col_candidates = ['y', 'diagnosis', 'target', 'label', 'class']
+target_col = next((c for c in target_col_candidates if c in data.columns), None)
+if target_col is None:
+    raise ValueError(f"Could not find a target column among {target_col_candidates}")
+
+# Encode target: Malignant=1, Benign=0 (if already numeric, map is safe)
+data[target_col] = data[target_col].map({'M': 1, 'B': 0}).fillna(data[target_col]).astype(int)
+data = data.rename(columns={target_col: 'y'})
+
+# Split features and labels
+X = data.drop(columns=['y']).values.astype(float)
+y = data['y'].values.astype(int)
+
+# Stratified split
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=RANDOM_STATE, stratify=y
+)
+
+# Standardize using TRAIN statistics only (avoid leakage)
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
+X_test  = scaler.transform(X_test)
+
+print("✅ Data ready")
+print("Train shape:", X_train.shape, "| Test shape:", X_test.shape)
+print("Class balance (train):", np.bincount(y_train), " (test):", np.bincount(y_test))
+
+# -------------------------------------------------------
+# Block 3: Polynomial kernel
+# -------------------------------------------------------
+def polynomial_kernel(X1, X2, degree=3, gamma=1.0, coef0=1.0):
+    """
+    K(x, z) = (gamma * x·z + coef0) ** degree
+    Shapes:
+      X1: (n1, d), X2: (n2, d) -> returns (n1, n2)
+    """
+    return (gamma * np.dot(X1, X2.T) + coef0) ** degree
+
+# -------------------------------------------------------
+# Block 4: SVM with Polynomial Kernel (Platt SMO, minimal)
+# -------------------------------------------------------
+class SVMPolynomial:
+    def __init__(self, C=1.0, degree=3, gamma=1.0, coef0=1.0, tol=1e-3, max_passes=10, seed=42):
+        self.C = float(C)
+        self.degree = int(degree)
+        self.gamma = float(gamma)
+        self.coef0 = float(coef0)
+        self.tol = float(tol)
+        self.max_passes = int(max_passes)
+        self.seed = int(seed)
+        self.b = 0.0
+
+    def _kernel(self, X1, X2):
+        return polynomial_kernel(X1, X2, self.degree, self.gamma, self.coef0)
+
+    def fit(self, X, y):
+        # Convert labels {0,1} -> {-1,+1}
+        y = np.where(y <= 0, -1.0, 1.0).astype(float)
+        m = X.shape[0]
+        alphas = np.zeros(m, dtype=float)
+        b = 0.0
+
+        K = self._kernel(X, X)
+
+        def E(i):
+            # Error f(x_i) - y_i
+            return (np.sum(alphas * y * K[:, i]) + b) - y[i]
+
+        passes = 0
+        rng = np.random.default_rng(self.seed)
+
+        while passes < self.max_passes:
+            num_changed = 0
+            for i in range(m):
+                Ei = E(i)
+                # Check KKT violation
+                if ((y[i]*Ei < -self.tol and alphas[i] < self.C) or
+                    (y[i]*Ei >  self.tol and alphas[i] > 0.0)):
+
+                    # Select j != i at random
+                    j = i
+                    while j == i:
+                        j = rng.integers(0, m)
+                    Ej = E(j)
+
+                    ai_old, aj_old = alphas[i], alphas[j]
+
+                    # Compute bounds L, H for alpha_j
+                    if y[i] != y[j]:
+                        L = max(0.0, aj_old - ai_old)
+                        H = min(self.C, self.C + aj_old - ai_old)
+                    else:
+                        L = max(0.0, ai_old + aj_old - self.C)
+                        H = min(self.C, ai_old + aj_old)
+                    if L == H:
+                        continue
+
+                    # Compute eta
+                    eta = 2.0*K[i, j] - K[i, i] - K[j, j]
+                    if eta >= 0:
+                        continue
+
+                    # Update alpha_j
+                    alphas[j] -= y[j] * (Ei - Ej) / eta
+                    alphas[j] = np.clip(alphas[j], L, H)
+
+                    if abs(alphas[j] - aj_old) < 1e-5:
+                        continue
+
+                    # Update alpha_i
+                    alphas[i] += y[i]*y[j]*(aj_old - alphas[j])
+
+                    # Compute b1 and b2, then update b
+                    b1 = (b - Ei
+                          - y[i]*(alphas[i]-ai_old)*K[i, i]
+                          - y[j]*(alphas[j]-aj_old)*K[i, j])
+                    b2 = (b - Ej
+                          - y[i]*(alphas[i]-ai_old)*K[i, j]
+                          - y[j]*(alphas[j]-aj_old)*K[j, j])
+
+                    if 0.0 < alphas[i] < self.C:
+                        b = b1
+                    elif 0.0 < alphas[j] < self.C:
+                        b = b2
+                    else:
+                        b = 0.5*(b1 + b2)
+
+                    num_changed += 1
+
+            passes = passes + 1 if num_changed == 0 else 0
+
+        # Save model parameters
+        self.alphas = alphas
+        self.b = b
+        self.X_train = X
+        self.y_train = y
+        self.support_ = np.where(alphas > 1e-8)[0]
+
+    def decision_function(self, X):
+        K = self._kernel(X, self.X_train)
+        return K @ (self.alphas * self.y_train) + self.b
+
+    def predict(self, X):
+        scores = self.decision_function(X)
+        # Return both hard labels and scores (scores for ROC)
+        return (scores >= 0).astype(int), scores
+
+# -------------------------------------------------------
+# Block 5: Train SVM (tuneable hyperparams)
+# -------------------------------------------------------
+n_features = X_train.shape[1]
+svm_poly = SVMPolynomial(
+    C=1.0,
+    degree=3,
+    gamma=1.0 / n_features,  # sensible default
+    coef0=1.0,
+    tol=1e-3,
+    max_passes=10,
+    seed=RANDOM_STATE
+)
+
+svm_poly.fit(X_train, y_train)
+y_pred, y_scores = svm_poly.predict(X_test)
+
+print("✅ Training complete")
+print(f"Support vectors: {len(svm_poly.support_)}")
+
+# -------------------------------------------------------
+# Block 6: Evaluation (Confusion Matrix, metrics, ROC + Visualization)
+# -------------------------------------------------------
+# Confusion Matrix and derived metrics
+cm = confusion_matrix(y_test, y_pred)
+tn, fp, fn, tp = cm.ravel()
+
+print("Confusion Matrix:\n", cm)
+print(f"TN={tn}, FP={fp}, FN={fn}, TP={tp}")
+print("Accuracy (%):", accuracy_score(y_test, y_pred) * 100.0)
+print("Precision:", precision_score(y_test, y_pred))
+print("Recall:", recall_score(y_test, y_pred))
+print("F1:", f1_score(y_test, y_pred))
+print("\nClassification Report:\n", classification_report(y_test, y_pred, digits=4))
+
+# ROC curve from decision scores (not hard labels)
+fpr, tpr, _ = roc_curve(y_test, y_scores)
+roc_auc = auc(fpr, tpr)
+print(f"AUC: {roc_auc:.4f}")
+
+# -------------------------------------------------------
+# Confusion Matrix Visualization
+# -------------------------------------------------------
+plt.figure(figsize=(5, 4))
+plt.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
+plt.title('Confusion Matrix - Polynomial Kernel SVM')
+plt.colorbar()
+tick_marks = np.arange(2)
+plt.xticks(tick_marks, ['Benign (0)', 'Malignant (1)'])
+plt.yticks(tick_marks, ['Benign (0)', 'Malignant (1)'])
+
+# Annotate cells
+thresh = cm.max() / 2.0
+for i in range(cm.shape[0]):
+    for j in range(cm.shape[1]):
+        plt.text(j, i, format(cm[i, j], 'd'),
+                 ha="center", va="center",
+                 color="white" if cm[i, j] > thresh else "black")
+
+plt.ylabel('True label')
+plt.xlabel('Predicted label')
+plt.tight_layout()
+plt.show()
+
+# -------------------------------------------------------
+# ROC Curve Visualization
+# -------------------------------------------------------
+plt.figure(figsize=(6, 5))
+plt.plot(fpr, tpr, lw=2, label=f'Polynomial SVM (AUC = {roc_auc:.3f})')
+plt.plot([0, 1], [0, 1], linestyle='--', color='gray')
+plt.title('ROC Curve - Polynomial Kernel SVM (From Scratch)')
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.legend(loc='lower right')
+plt.grid(True, alpha=0.3)
+plt.show()
+
+# -------------------------------------------------------
+# Block 7 (Optional): Quick tweaks
+# -------------------------------------------------------
+# Try different configs, e.g.:
+for deg in [2, 3, 4]:
+    svm_poly = SVMPolynomial(C=1.0, degree=deg, gamma=1.0/X_train.shape[1], coef0=1.0, tol=1e-3, max_passes=12, seed=RANDOM_STATE)
+    svm_poly.fit(X_train, y_train)
+    y_pred, y_scores = svm_poly.predict(X_test)
+    print(f"Degree={deg} | Accuracy={accuracy_score(y_test, y_pred):.4f}")

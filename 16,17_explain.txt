@@ -1,0 +1,508 @@
+Block-level roadmap (what each section does & why)
+
+Imports — bring in libraries for data handling, plotting, splitting, and evaluation. 
+
+16,17 - navie bayes
+
+Load & inspect data — read the spam dataset, check shape and preview rows. 
+
+16,17 - navie bayes
+
+Feature/target setup & cleaning — drop ID/label from X, make y integer, force numeric features & fill missing. Ensures the model sees only numbers. 
+
+16,17 - navie bayes
+
+Quick EDA — class balance plot; email length histograms; optional KDE; top frequent words bar chart. Helps you understand data patterns. 
+
+16,17 - navie bayes
+
+Train/test split — keep 20% as unseen test data (with stratification to preserve class balance). 
+
+16,17 - navie bayes
+
+Custom Multinomial Naive Bayes (from scratch) — estimate priors P(c) and word likelihoods P(word|c) with Laplace smoothing; predict by maximizing log-posterior. 
+
+16,17 - navie bayes
+
+Evaluation — confusion matrix + Accuracy/Precision/Recall/F1 using sklearn; then compute the same metrics manually to show understanding; print classification report; visualize matrix. 
+
+16,17 - navie bayes
+
+Demo predictions — explain why raw text can’t be passed (model expects word counts) and show placeholder outputs for two example messages. 
+
+16,17 - navie bayes
+
+Line-by-line explanation (simple terms + concepts)
+1) Imports
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+pandas = tables (DataFrame), file I/O. numpy = fast arrays/math. matplotlib = plots. 
+
+16,17 - navie bayes
+
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import (
+    confusion_matrix, accuracy_score, precision_score, recall_score, f1_score, classification_report
+)
+
+
+train_test_split: split features/labels into train vs test.
+
+metrics: standard classification metrics and confusion matrix. 
+
+16,17 - navie bayes
+
+2) Load & inspect
+data = pd.read_csv("emails_16_17_18_19.csv")
+print("Shape:", data.shape)
+display(data.head())
+
+
+Read CSV into data. Print (rows, cols). Show first few rows for a quick sanity check. (In plain Python, use print(data.head()) if display isn’t available.) 
+
+16,17 - navie bayes
+
+3) Set up features (X) and target (y) + clean numerics
+X_df = data.drop(columns=["Email No.", "Prediction"])  # drop ID and target from features
+y_series = data["Prediction"].astype(int)
+
+
+Remove the ID and the label column from the features.
+
+Make labels integer (0 = Not Spam, 1 = Spam). 
+
+16,17 - navie bayes
+
+X_df = X_df.apply(pd.to_numeric, errors="coerce").fillna(0).astype(int)
+
+
+Convert all features to numbers; non-numeric → NaN (coerce), then replace NaNs with 0; finally store as integers (word counts).
+
+Concept: Naive Bayes here assumes count features (bag-of-words style). 
+
+16,17 - navie bayes
+
+4) EDA — class balance
+plt.figure(figsize=(4,3))
+y_series.value_counts().sort_index().plot(kind='bar', color=['skyblue', 'salmon'])
+plt.title('Class Distribution: Not Spam (0) vs Spam (1)')
+plt.xticks([0,1])
+plt.ylabel('Number of Emails')
+plt.show()
+
+
+Bar chart shows how many Not Spam (0) vs Spam (1) examples.
+
+Why: imbalance can bias metrics; good to know before modeling. 
+
+16,17 - navie bayes
+
+EDA — email “length” (total word counts)
+email_length = X_df.sum(axis=1)
+plt.figure(figsize=(6,4))
+plt.hist(email_length[y_series==0], bins=40, alpha=0.6, color='skyblue', label='Not Spam')
+plt.hist(email_length[y_series==1], bins=40, alpha=0.6, color='salmon', label='Spam')
+plt.title('Email Length Distribution (Total Word Count per Email)')
+plt.xlabel('Total Word Count')
+plt.ylabel('Number of Emails')
+plt.legend()
+plt.show()
+
+
+Compute total word count per email (sum across word-count columns).
+
+Overlaid histograms let you see if spam tends to be longer/shorter. 
+
+16,17 - navie bayes
+
+Optional KDE density (if seaborn available)
+try:
+    import seaborn as sns
+    plt.figure(figsize=(6,4))
+    sns.kdeplot(email_length[y_series==0], label='Not Spam', fill=True)
+    sns.kdeplot(email_length[y_series==1], label='Spam', fill=True)
+    plt.title('Email Length Density (KDE)')
+    plt.xlabel('Total Word Count')
+    plt.ylabel('Density')
+    plt.legend()
+    plt.show()
+except Exception:
+    pass
+
+
+KDE plot (smoothed density) for visual comparison; wrapped in try so code still runs if seaborn isn’t installed. 
+
+16,17 - navie bayes
+
+EDA — top frequent words
+top_words = X_df.mean().sort_values(ascending=False).head(10)
+plt.figure(figsize=(6,3))
+top_words.plot(kind='bar', color='lightgreen')
+plt.title('Top 10 Most Frequent Words (Avg Count)')
+plt.ylabel('Average Count per Email')
+plt.show()
+
+
+Mean count per word across all emails → which words appear most.
+
+Why: intuition for vocabulary; may explain model behavior later. 
+
+16,17 - navie bayes
+
+5) Numpy arrays + train/test split
+X = X_df.to_numpy()
+y = y_series.to_numpy()
+
+
+Convert DataFrame/Series to NumPy arrays (faster math). 
+
+16,17 - navie bayes
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+print(f"Train: {X_train.shape}, Test: {X_test.shape}")
+
+
+Split: 80% train, 20% test.
+
+stratify=y preserves spam/not-spam ratio in both sets.
+
+random_state=42 for reproducibility. 
+
+16,17 - navie bayes
+
+6) Custom Multinomial Naive Bayes (from scratch)
+
+Concept recap: Treat each email as counts of words. For each class 
+𝑐
+c (spam/not-spam), estimate prior 
+𝑃
+(
+𝑐
+)
+P(c) and conditional word probabilities 
+𝑃
+(
+𝑤
+𝑗
+∣
+𝑐
+)
+P(w
+j
+	​
+
+∣c). Predict class that maximizes
+
+log
+⁡
+𝑃
+(
+𝑐
+)
++
+∑
+𝑗
+𝑥
+𝑗
+log
+⁡
+𝑃
+(
+𝑤
+𝑗
+∣
+𝑐
+)
+logP(c)+∑
+j
+	​
+
+x
+j
+	​
+
+logP(w
+j
+	​
+
+∣c). Use Laplace smoothing (add-one) to avoid zeros. 
+
+16,17 - navie bayes
+
+def train_naive_bayes(X_train, y_train, alpha=1):
+    classes = np.unique(y_train)
+    priors = {}
+    cond_probs = {}
+
+
+classes: the distinct labels {0,1}.
+
+priors: class prior probabilities.
+
+cond_probs: per-class word probability vectors. 
+
+16,17 - navie bayes
+
+    for c in classes:
+        X_c = X_train[y_train == c]
+        priors[c] = len(X_c) / len(X_train)                 # P(c)
+        feature_sum = X_c.sum(axis=0) + alpha               # add-one smoothing
+        total_sum = feature_sum.sum()
+        cond_probs[c] = feature_sum / total_sum             # P(feature|c)
+
+
+Filter training rows for class c.
+
+Prior 
+𝑃
+(
+𝑐
+)
+P(c) = fraction of training rows in class c.
+
+Sum word counts across those rows → total counts per word given class. Add alpha=1 (Laplace) to each count.
+
+Normalize by total to get 
+𝑃
+(
+𝑤
+𝑗
+∣
+𝑐
+)
+P(w
+j
+	​
+
+∣c) for every word. 
+
+16,17 - navie bayes
+
+    return classes, priors, cond_probs
+
+
+Return parameters needed for prediction. 
+
+16,17 - navie bayes
+
+def predict_naive_bayes(X_test, classes, priors, cond_probs):
+    preds = []
+    log_priors = {c: np.log(priors[c]) for c in classes}
+    log_cond = {c: np.log(cond_probs[c]) for c in classes}
+
+
+Work in log-space to avoid underflow: log of priors and log of conditional probabilities.
+
+Why logs? Products of many small probabilities can become numerically 0; sums of logs are stable. 
+
+16,17 - navie bayes
+
+    for x in X_test:
+        scores = {c: log_priors[c] + np.sum(x * log_cond[c]) for c in classes}
+        preds.append(max(scores, key=scores.get))
+    return np.array(preds)
+
+
+For each test email x (vector of word counts): compute
+
+log
+⁡
+𝑃
+(
+𝑐
+)
++
+∑
+𝑗
+𝑥
+𝑗
+log
+⁡
+𝑃
+(
+𝑤
+𝑗
+∣
+𝑐
+)
+logP(c)+∑
+j
+	​
+
+x
+j
+	​
+
+logP(w
+j
+	​
+
+∣c) for each class.
+
+Pick the class with the larger score. Collect predictions. 
+
+16,17 - navie bayes
+
+# Train + Predict
+classes, priors, cond_probs = train_naive_bayes(X_train, y_train, alpha=1)
+y_pred = predict_naive_bayes(X_test, classes, priors, cond_probs)
+
+
+Learn parameters on training data, then predict on test data. 
+
+16,17 - navie bayes
+
+7) Evaluation (sklearn)
+cm = confusion_matrix(y_test, y_pred)
+accuracy = accuracy_score(y_test, y_pred)
+precision = precision_score(y_test, y_pred, zero_division=0)
+recall = recall_score(y_test, y_pred, zero_division=0)
+f1 = f1_score(y_test, y_pred, zero_division=0)
+
+
+Compute confusion matrix and metrics.
+
+zero_division=0 avoids errors if a denominator is 0 (returns 0 instead). 
+
+16,17 - navie bayes
+
+print("Confusion Matrix:\n", cm)
+print("\n--- Performance Metrics ---")
+print(f"Accuracy : {accuracy:.4f}")
+print(f"Precision: {precision:.4f}")
+print(f"Recall   : {recall:.4f}")
+print(f"F1-Score : {f1:.4f}")
+
+
+Human-readable summary of performance.
+
+Concepts:
+
+Accuracy = (TP+TN)/All
+
+Precision = TP/(TP+FP) — “How many predicted spam are truly spam?”
+
+Recall = TP/(TP+FN) — “How many real spam did we catch?”
+
+F1 — harmonic mean of precision & recall. 
+
+16,17 - navie bayes
+
+print("\n--- Classification Report ---")
+print(classification_report(y_test, y_pred, target_names=["Not Spam","Spam"], zero_division=0))
+
+
+Per-class Precision/Recall/F1 and macro/micro/weighted averages. 
+
+16,17 - navie bayes
+
+7b) Metrics from scratch (manual)
+TP = np.sum((y_test == 1) & (y_pred == 1))
+TN = np.sum((y_test == 0) & (y_pred == 0))
+FP = np.sum((y_test == 0) & (y_pred == 1))
+FN = np.sum((y_test == 1) & (y_pred == 0))
+
+
+Manually compute confusion matrix entries using boolean masks. 
+
+16,17 - navie bayes
+
+print("Confusion Matrix (from scratch):")
+conf_matrix = np.array([[TN, FP],
+                        [FN, TP]], dtype=int)
+print(conf_matrix)
+
+
+Print the matrix in standard layout:
+
+[[TN FP]
+ [FN TP]]
+``` :contentReference[oaicite:31]{index=31}
+
+total = TP + TN + FP + FN
+accuracy  = (TP + TN) / total if total else 0.0
+precision = TP / (TP + FP) if (TP + FP) else 0.0
+recall    = TP / (TP + FN) if (TP + FN) else 0.0
+f1        = 2 * precision * recall / (precision + recall) if (precision + recall) else 0.0
+
+
+Same formulas as sklearn, guarded against zero denominators. 
+
+16,17 - navie bayes
+
+print("\n--- Performance Metrics ---")
+print(f"\nAccuracy : {accuracy:.4f}")
+print(f"Precision: {precision:.4f}")
+print(f"Recall   : {recall:.4f}")
+print(f"F1-Score : {f1:.4f}")
+
+
+Show manual metric values; should match sklearn’s (up to rounding). 
+
+16,17 - navie bayes
+
+print("\n--- Classification Report ---")
+print(classification_report(y_test, y_pred, target_names=["Not Spam","Spam"], zero_division=0))
+
+
+Re-print the detailed report for convenience. 
+
+16,17 - navie bayes
+
+Confusion matrix heatmap
+plt.figure(figsize=(4,3))
+plt.imshow(cm)
+plt.title('Confusion Matrix')
+plt.xlabel('Predicted')
+plt.ylabel('Actual')
+plt.xticks([0,1], ['Not Spam', 'Spam'])
+plt.yticks([0,1], ['Not Spam', 'Spam'])
+for i in range(2):
+    for j in range(2):
+        plt.text(j, i, cm[i, j], ha='center', va='center')
+plt.show()
+
+
+Visual grid of the confusion matrix with counts written on cells.
+
+Useful for quick, intuitive inspection. 
+
+16,17 - navie bayes
+
+8) Demo predictions (text note)
+new_messages = [
+    "You’ve been selected for a free vacation trip to Maldives! Reply YES to claim your prize now.",  
+    "Hey, don't forget to send me the project report before tonight.",  
+]
+
+
+Two example sentences for demonstration. 
+
+16,17 - navie bayes
+
+# NOTE: This dataset is numeric (word counts), so we can’t directly predict text.
+# Instead, let's just simulate what we *would* display.
+fake_predictions = ["Spam", "Not Spam"]
+
+
+Important: The model expects word-count vectors, not raw text.
+
+So these are placeholder labels, not real predictions.
+
+In a real pipeline you’d convert text → counts (e.g., CountVectorizer) using the same vocabulary learned in training. 
+
+16,17 - navie bayes
+
+for msg, pred in zip(new_messages, fake_predictions):
+    print("\nMessage:", msg)
+    print("Prediction:", pred)
+
+
+Print each message with its (simulated) class. 
+
+16,17 - navie bayes

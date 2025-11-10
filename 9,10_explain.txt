@@ -1,0 +1,347 @@
+Block-level roadmap (what each section does & why)
+
+Imports — bring in Python libraries you need for data handling, plotting, and ML.
+
+Load & quick peek — read the CSV, look at shape/columns/info/missing values to understand data quality.
+
+Drop unusable columns & nulls — remove irrelevant IDs and rows with missing values to avoid errors/leakage.
+
+Time features — convert timestamps to datetime, then extract hour/day/month/year/weekday to help the model learn temporal patterns.
+
+EDA visuals — correlation heatmap, target histogram, and categorical countplot to understand relationships, distributions, and imbalance.
+
+Distance feature — compute a rough distance proxy from pickup/dropoff coords (great predictor for fare).
+
+Outlier filtering — keep realistic fares and distances to avoid skewing the model.
+
+Split X/y — select features (X) and target (y).
+
+Scale features — standardize X so PCA and linear models behave well.
+
+Train/test split — hold out 20% for unbiased evaluation.
+
+Baseline model (no PCA) — train Linear Regression on original scaled features, compute RMSE/R²/MAE.
+
+PCA transform — reduce dimensions to 8 components to de-noise/compress features.
+
+Model with PCA — train & evaluate again to compare with the baseline. 
+
+9,10 - pca
+
+Line-by-line explanation (simple terms + mini-concepts)
+Imports
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+
+pandas (pd): tables & data cleaning.
+
+numpy (np): fast math/arrays.
+
+seaborn (sns): prettier statistical plots.
+
+matplotlib.pyplot (plt): base plotting engine. 
+
+9,10 - pca
+
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.linear_model import LinearRegression
+
+
+train_test_split: splits data into train/test sets.
+
+StandardScaler: standardizes features (mean=0, std=1).
+
+PCA: reduces feature dimensions using principal components.
+
+LinearRegression: simple linear model for prediction. 
+
+9,10 - pca
+
+Load data & quick checks
+data = pd.read_csv("uber.csv", encoding='latin-1')
+
+
+Reads CSV using latin-1 encoding (prevents decode errors).
+
+data.head()
+
+
+Shows first 5 rows to sanity-check columns/values.
+
+data.shape
+
+
+Returns (rows, columns) to know dataset size.
+
+data.columns
+
+
+Lists column names to see available features.
+
+data.info()
+
+
+Prints dtypes and non-null counts (helps spot strings vs numbers and missingness).
+
+data.isnull().sum()
+
+
+Counts missing values per column. 
+
+9,10 - pca
+
+Drop junk columns & nulls
+data = data.drop(['Unnamed: 0', 'key'], axis=1)
+
+
+Removes ID/duplicate index columns that don’t help prediction.
+
+data = data.dropna()
+
+
+Drops any rows that have missing values (simple cleanup path).
+
+data.isnull().sum()
+
+
+Re-check: should now be zeros everywhere. 
+
+9,10 - pca
+
+Time handling & feature engineering
+data['pickup_datetime'] = pd.to_datetime(data['pickup_datetime'])
+
+
+Converts text timestamps into datetime objects (so we can extract parts).
+
+data['pickup_datetime'].head(10)
+
+
+Peek at converted values to confirm conversion worked.
+
+data['hour'] = data["pickup_datetime"].dt.hour
+data['day'] = data["pickup_datetime"].dt.day
+data['month'] = data["pickup_datetime"].dt.month
+data['year'] = data["pickup_datetime"].dt.year
+data['weekday'] = data["pickup_datetime"].dt.weekday
+
+
+Extracts hour/day/month/year/weekday (useful predictors: fares vary by time). 
+
+9,10 - pca
+
+data.describe()
+
+
+Summary stats (mean, std, min, max, quartiles) to spot scale/outliers. 
+
+9,10 - pca
+
+EDA plots
+plt.figure(figsize=(12, 6))
+sns.heatmap(data.corr(numeric_only=True), annot=True, cmap="coolwarm")
+plt.title("Correlation Heatmap")
+plt.show()
+
+
+Correlation heatmap: shows pairwise linear relationships between numeric columns (bright colors = stronger correlation).
+
+numeric_only=True: ignore non-numeric columns.
+
+annot=True: prints correlation numbers inside cells. 
+
+9,10 - pca
+
+plt.figure(figsize=(6, 4))
+sns.histplot(data['fare_amount'], bins=50, kde=True, color="red")
+plt.title("Fare Amount Distribution")
+plt.xlabel("Fare Amount ($)")
+plt.ylabel("Count")
+plt.show()
+
+
+Histogram + KDE: distribution of target (fare_amount) to see skew/outliers.
+
+plt.figure(figsize=(5, 3))
+sns.countplot(x='passenger_count', hue='passenger_count', data=data, palette='viridis', legend=False)
+plt.title("Passenger Count Distribution")
+plt.show()
+
+
+Countplot: frequency of each passenger count (class imbalance, typical values). 
+
+9,10 - pca
+
+Distance feature (crucial predictor)
+data['distance'] = np.sqrt(
+    (data['dropoff_latitude'] - data['pickup_latitude']) ** 2 +
+    (data['dropoff_longitude'] - data['pickup_longitude']) ** 2
+)
+
+
+Creates a rough distance using straight-line (Euclidean) distance on lat/long degrees.
+
+Not true kilometers, but still correlates well with fare. 
+
+9,10 - pca
+
+plt.figure(figsize=(6, 4))
+sns.scatterplot(x='distance', y='fare_amount', data=data, alpha=0.4)
+plt.title("Fare vs Distance")
+plt.xlabel("Approx Distance (degrees)")
+plt.ylabel("Fare Amount ($)")
+plt.show()
+
+
+Scatterplot: checks positive relation between distance and fare (sanity check).
+
+data.columns
+
+
+Re-list columns to see new distance feature present. 
+
+9,10 - pca
+
+Basic outlier filtering
+data = data[(data['fare_amount'] > 0) & (data['distance'] < 5)]
+
+
+Keep only positive fares and reasonable distances (<5 degrees) to remove junk/outliers.
+
+data.shape
+
+
+See how many rows remain after filtering. 
+
+9,10 - pca
+
+Feature/Target split
+X = data[['pickup_longitude', 'pickup_latitude',
+           'dropoff_longitude', 'dropoff_latitude', 'passenger_count', 'hour',
+           'day', 'month', 'year', 'weekday', 'distance']]
+y = data['fare_amount']
+
+
+X: all predictors (locations, time parts, passengers, distance).
+
+y: the target we want to predict (fare). 
+
+9,10 - pca
+
+Scaling (very important for PCA & Linear Regression stability)
+scaler = StandardScaler()
+X_Scaled = scaler.fit_transform(X)
+
+
+fit_transform learns mean/std from training data and applies scaling.
+
+Standardization helps PCA (which is variance-based) and prevents big-scale features from dominating. 
+
+9,10 - pca
+
+Train/Test split
+X_train, X_test, y_train, y_test = train_test_split(X_Scaled, y, test_size=0.2, random_state=42)
+
+
+80/20 split; random_state=42 ensures reproducibility.
+
+Test set stays untouched during training to give fair evaluation. 
+
+9,10 - pca
+
+Baseline Linear Regression (no PCA)
+lr_nopca = LinearRegression()
+lr_nopca.fit(X_train, y_train)
+y_pred = lr_nopca.predict(X_test)
+
+
+Create model, train on training set, predict on test set.
+
+mse_manual = np.mean((y_test - y_pred) ** 2)
+rmse_pca = np.sqrt(mse_manual)
+
+
+MSE = average squared errors; RMSE = sqrt(MSE), interpretable in fare units ($).
+
+ss_res = np.sum((y_test - y_pred) ** 2)
+ss_tot = np.sum((y_test - np.mean(y_test)) ** 2)
+r2_pca = 1 - (ss_res / ss_tot)
+
+
+R²: proportion of variance explained by the model (closer to 1 is better).
+
+mae_no_pca = np.mean(np.abs(y_test - y_pred))
+
+
+MAE: average absolute error (also in $), robust and easy to interpret.
+
+print("Model Without PCA:")
+print("RMSE:", round(rmse_pca, 4))
+print("R² Score:", round(r2_pca, 4))
+print("MAE:", round(mae_no_pca, 4))
+
+
+Prints baseline metrics for comparison later.
+(Note: variable names rmse_pca / r2_pca are reused later — they still hold the “no-PCA” values at this point.) 
+
+9,10 - pca
+
+PCA (Dimensionality Reduction)
+pca = PCA(n_components=8)
+X_pca = pca.fit_transform(X_Scaled)
+
+
+Creates PCA keeping 8 principal components (captures most variance in a compressed form).
+
+fit_transform computes components and projects data into the new 8-D space. 
+
+9,10 - pca
+
+Split again (now on PCA features)
+X_train_pca, X_test_pca, y_train_pca, y_test_pca = train_test_split(X_pca, y, test_size=0.2, random_state=42)
+
+
+Same 80/20 split idea, but using PCA-transformed features.
+
+Linear Regression with PCA
+lr_pca = LinearRegression()
+lr_pca.fit(X_train_pca, y_train_pca)
+
+
+Train the same model on compressed features.
+
+y_pred_pca = lr_pca.predict(X_test_pca)
+
+
+Predict fares on the PCA test set. 
+
+9,10 - pca
+
+Metrics for PCA model
+mse_manual = np.mean((y_test_pca - y_pred_pca) ** 2)
+rmse_pca = np.sqrt(mse_manual)
+
+
+RMSE (with PCA).
+
+ss_res = np.sum((y_test_pca - y_pred_pca) ** 2)
+ss_tot = np.sum((y_test_pca - np.mean(y_test_pca)) ** 2)
+r2_pca = 1 - (ss_res / ss_tot)
+mae_pca = np.mean(np.abs(y_test_pca - y_pred_pca))
+
+
+R² and MAE (with PCA).
+
+print("Model With PCA:")
+print("RMSE:", round(rmse_pca, 4))
+print("R² Score:", round(r2_pca, 4))
+print("MAE:", round(mae_pca, 4))
+
+
+Print PCA model performance to compare with the baseline.
+(Now the variable names rmse_pca / r2_pca really correspond to the PCA model.)

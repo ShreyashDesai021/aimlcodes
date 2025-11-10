@@ -1,0 +1,341 @@
+Block-level roadmap (what each section does & why)
+
+Imports & dataset load — bring libraries, read the CSV, quick sanity checks.
+
+Pre-processing — drop missing rows; pick the two columns needed for simple linear regression (hours → score).
+
+Basic scatter plot — visualize the relationship (is it roughly linear?).
+
+Lightweight EDA — auto-find numeric columns and plot histograms/boxplots to see spread and outliers.
+
+Feature normalization — standardize X (helps gradient descent behave well).
+
+Predict & visualize regression line — define predict and plot fitted line (but note: m and c must be trained first).
+
+Manual metrics — compute MSE and R² from scratch.
+
+From-scratch Linear Regression (Gradient Descent) — robust section that really learns m and c; includes cost curve + final line plot. 
+
+12 - student
+
+Heads-up: Your file repeats some steps (two Visualization blocks, two Normalization blocks, two EDA blocks) and calls predict(X, m, c) before m, c are learned. In practice, run the Gradient Descent block first (or move it above the “Prediction” block), then make predictions. I note those below. 
+
+12 - student
+
+Line-by-line explanation (simple terms + key concepts)
+Imports & inline plotting
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+Load pandas (tables), numpy (fast math/arrays), matplotlib (plots). 
+
+12 - student
+
+# %matplotlib inline
+
+
+(For Jupyter only) show plots inside the notebook. Commented here. 
+
+12 - student
+
+Load dataset + initial checks
+file_path = "student_exam_scores_12_13.csv"
+data = pd.read_csv(file_path)
+
+
+Read the CSV into data. 
+
+12 - student
+
+print("Dataset Preview:\n")
+print(data.head())
+
+
+Show first 5 rows to confirm columns/values look right. 
+
+12 - student
+
+print("\nDataset Shape:", data.shape)
+print("\nMissing Values by Column:\n", data.isnull().sum())
+
+
+See size (#rows, #cols) and per-column missing counts. 
+
+12 - student
+
+Step 1: Pre-processing
+data = data.dropna().copy()
+
+
+Remove rows with any missing values; .copy() avoids warnings. 
+
+12 - student
+
+X = data["hours_studied"].values.astype(float) # independent var
+Y = data["exam_score"].values.astype(float)    # dependent var
+
+
+Extract the single feature and target as float arrays (required for math). 
+
+12 - student
+
+print(f"Total valid rows after preprocessing: {len(X)}")
+print(X[:5])
+
+
+Quick counts and first few X values to sanity-check. 
+
+12 - student
+
+Step 2: Visualization (duplicated twice — either is fine)
+plt.figure(figsize=(8, 5))
+plt.scatter(X, Y, s=60, label="Data points")
+plt.title("Study Hours vs Exam Score")
+plt.xlabel("Study Hours"); plt.ylabel("Exam Score")
+plt.grid(True); plt.legend(); plt.show()
+
+
+Scatter plot checks linear trend (more hours → higher score?). Choose one copy; both blocks are the same. 
+
+12 - student
+
+“Try to find working dataframe” + numeric EDA
+try:
+    _df = data.copy()
+except NameError:
+    try:
+        _df = df.copy()
+    except NameError:
+        import os
+        for _p in ["/mnt/data/student_exam_scores_12_13.csv", "/mnt/data/Student_performance_data _.csv"]:
+            if os.path.exists(_p):
+                _df = pd.read_csv(_p)
+                break
+        else:
+            raise RuntimeError(...)
+
+
+Defensive code: ensures _df exists even if data/df didn’t. It tries multiple known paths; otherwise raises a clear error. Good for notebooks with variable name drift. 
+
+12 - student
+
+num_cols = _df.select_dtypes(include=[np.number]).columns.tolist()
+if not num_cols:
+    raise RuntimeError("No numeric columns found for EDA.")
+
+
+Identify numeric columns automatically for EDA; error if none. 
+
+12 - student
+
+for col in num_cols:
+    plt.figure()
+    _df[col].hist(bins=20)
+    plt.title(f"Histogram — {col}")
+    plt.xlabel(col); plt.ylabel("Frequency")
+    plt.show()
+
+
+Histograms for each numeric column (shape, skew). 
+
+12 - student
+
+for col in num_cols:
+    plt.figure()
+    plt.boxplot(_df[col].dropna(), vert=True, labels=[col])
+    plt.title(f"Boxplot — {col}")
+    plt.ylabel(col)
+    plt.show()
+
+
+Boxplots highlight outliers and quartiles. (This EDA block appears twice later; keep one.) 
+
+12 - student
+
+Step 3: Feature Normalization (duplicated — keep one)
+X = (X - np.mean(X)) / np.std(X)
+print("First 10 normalized X values:\n", X[:10])
+
+
+Standardization: center to 0 mean / unit std. Helps gradient descent converge stably and makes the scale of m meaningful. (With a single feature, this is simple and effective.) 
+
+12 - student
+
+Step 6: Prediction (⚠️ requires trained m, c)
+def predict(X, m, c):
+    return m * X + c
+
+
+Hypothesis function h(X)=mX+c. 
+
+12 - student
+
+Y_pred = predict(X, m, c)
+print("First 10 predictions:\n", Y_pred[:10])
+
+
+Issue: m and c aren’t defined yet here. They’re computed later in the Gradient Descent block. Either move that block above this call or delay predictions until after training. 
+
+12 - student
+
+Step 7: Visualize Regression Line
+plt.figure(figsize=(8, 5))
+plt.scatter(X, Y, s=60, label="Actual Data")
+plt.plot(X, Y_pred, label="Regression Line", color="red")
+...
+plt.show()
+
+
+Overlays fitted line on the scatter. Works only after Y_pred is valid (i.e., after m, c are learned). 
+
+12 - student
+
+Step 8: Manual evaluation metrics
+def mean_squared_error(y_true, y_pred):
+    return sum((y_true - y_pred) ** 2) / len(y_true)
+
+
+MSE = average squared error; penalizes big mistakes more. 
+
+12 - student
+
+def r2_score(y_true, y_pred):
+    ss_res = sum((y_true - y_pred) ** 2)
+    ss_tot = sum((y_true - np.mean(y_true)) ** 2)
+    return 1 - (ss_res / ss_tot)
+
+
+R² = fraction of variance explained (closer to 1 is better). 
+
+12 - student
+
+mse = mean_squared_error(Y, Y_pred)
+r2 = r2_score(Y, Y_pred)
+print(f"Mean Squared Error (MSE): {mse:.4f}")
+print(f"R^2 Score: {r2:.4f}")
+
+
+Prints metrics (again: only valid after Y_pred is computed from trained m, c). 
+
+12 - student
+
+(Repeated) EDA — Histograms & Boxplots
+
+The same logic as earlier; keep one copy to avoid repetition. 
+
+12 - student
+
+From-scratch Linear Regression with Gradient Descent (core learning section)
+
+This is the heart of the script: it learns m and c by minimizing MSE via gradient descent. After this block runs, you can safely call predict(X, m, c) and plot the line. 
+
+12 - student
+
+# Candidate pairs: (StudyTimeWeekly -> GPA) or (hours_studied -> exam_score)
+candidates = [("StudyTimeWeekly", "GPA"), ("hours_studied", "exam_score")]
+X = y = None
+for fx, ty in candidates:
+    if fx in _df.columns and ty in _df.columns:
+        X = _df[fx].to_numpy(dtype=float)
+        y = _df[ty].to_numpy(dtype=float)
+        feature_name, target_name = fx, ty
+        break
+
+
+Auto-selects the right columns depending on what exists in your file/notebook. Flexible across datasets. 
+
+12 - student
+
+m = 0.0; c = 0.0        # initialize slope & intercept
+alpha = 0.01            # learning rate (step size)
+epochs = 5000           # max iterations
+tol = 1e-9              # early stop if improvement is tiny
+n = len(X)
+cost_history = []
+
+
+Hyperparameters: alpha controls how big each step is; epochs limits iterations; tol stops when progress is negligible. cost_history tracks how loss falls over time. 
+
+12 - student
+
+def mse_cost(m, c, X, y):
+    y_pred = m * X + c
+    return (1/(2*n)) * np.sum((y_pred - y)**2)  # classic J(m,c)
+
+
+Cost function (half MSE) used in many derivations; the 1/2 cancels the 2 from the derivative. 
+
+12 - student
+
+prev_cost = mse_cost(m, c, X, y)
+for i in range(epochs):
+    y_pred = m * X + c
+    error = y_pred - y
+    dm = (1/n) * np.sum(error * X)   # ∂J/∂m
+    dc = (1/n) * np.sum(error)       # ∂J/∂c
+    m = m - alpha * dm               # gradient step for m
+    c = c - alpha * dc               # gradient step for c
+    cost = mse_cost(m, c, X, y)
+    cost_history.append(cost)
+    if abs(prev_cost - cost) < tol:
+        break
+    prev_cost = cost
+
+
+Gradient Descent: compute gradients and step “downhill” until little improvement.
+
+If alpha too big → diverge; too small → very slow.
+
+Normalizing X earlier helps these updates be stable. 
+
+12 - student
+
+print(f"Feature used: {feature_name}  ->  Target: {target_name}")
+print(f"""Trained parameters (Gradient Descent):
+m (slope)     = {m:.8f}
+c (intercept) = {c:.8f}
+Iterations    = {len(cost_history)}""")
+
+
+Report learned parameters and how many iterations it took. 
+
+12 - student
+
+y_hat = m * X + c
+mse = np.mean((y - y_hat)**2)
+ss_res = np.sum((y - y_hat)**2)
+ss_tot = np.sum((y - np.mean(y))**2)
+r2 = 1 - ss_res/ss_tot if ss_tot != 0 else float("nan")
+print(f"MSE: {mse:.8f}")
+print(f"R^2: {r2:.6f}")
+
+
+Evaluate the fitted line using MSE and R² (manual formulas). 
+
+12 - student
+
+plt.figure()
+plt.plot(cost_history)
+plt.title("Gradient Descent Convergence (Cost vs Iterations)")
+plt.xlabel("Iteration"); plt.ylabel("Cost (MSE/2)")
+plt.show()
+
+
+Cost curve should go down smoothly if learning is working. 
+
+12 - student
+
+order = np.argsort(X)
+plt.figure()
+plt.scatter(X, y, alpha=0.75, edgecolor="k", label="Data")
+plt.plot(X[order], y_hat[order], linewidth=2, label="Fitted Line (GD)")
+plt.title(f"Linear Regression (GD) — {feature_name} vs {target_name}")
+plt.xlabel(feature_name); plt.ylabel(target_name)
+plt.legend(); plt.show()
+
+
+Final visualization: data and the learned line (sorted by X so the line isn’t zig-zag). 
+
+12 - student

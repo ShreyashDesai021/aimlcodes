@@ -1,0 +1,387 @@
+Block-level roadmap (what each section does & why)
+
+Imports & constants — bring in NumPy/Pandas/Matplotlib and scikit-learn tools; set the CSV path.
+
+Load & sanitize data — read CSV, keep only needed columns, coerce to numeric, drop bad rows.
+
+Quick check & basic EDA — preview shape/head; plot price distribution; scatter Area vs Price with a best-fit line.
+
+Prepare X, y — split features vs target.
+
+Manual K-Fold CV — make folds, encode & scale inside each fold (avoids leakage), train Linear Regression, collect metrics (R²/RMSE/MAE).
+
+Summarize CV — per-fold results + averages.
+
+Final model on all data — fit full encoder/scaler, train on all rows, extract coefficients with names.
+
+Predicted vs Actual plot — visualize full-model fit with points (blue) and best-fit line (red). 
+
+11 - house
+
+Line-by-line walkthrough (simple terms + concepts)
+Imports & dataset path
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+
+NumPy for fast arrays/math; Pandas for tables and cleaning; Matplotlib for plots. 
+
+11 - house
+
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+
+
+OneHotEncoder: turns a text category (e.g., “Downtown”) into 0/1 columns so models can use it.
+
+StandardScaler: makes numeric features have mean 0, std 1 (helps many models; avoids scale dominance).
+
+LinearRegression: Ordinary Least Squares (OLS) model to predict a continuous target (price).
+
+Metrics:
+
+r2_score (explained variance, higher is better),
+
+mean_squared_error (average squared error),
+
+mean_absolute_error (average absolute error). 
+
+11 - house
+
+DATA_PATH = "Synthetic_House_Price_Dataset.csv"
+
+
+A constant string that points to your dataset file. Easier to maintain than hard-coding in multiple places. 
+
+11 - house
+
+Load & sanitize data
+df = pd.read_csv(DATA_PATH)
+
+
+Reads the CSV into a DataFrame named df. 
+
+11 - house
+
+df.columns = [c.strip().lower() for c in df.columns]
+
+
+Cleans column names: trims spaces and lowercases (prevents “Area” vs “area” confusion). 
+
+11 - house
+
+req = ['area','bedrooms','location','price']
+missing = [c for c in req if c not in df.columns]
+if missing:
+    raise ValueError(f"Dataset must contain columns: {req}. Missing: {missing}")
+
+
+Defines the required columns, checks if any are absent, and raises a clear error early if the CSV doesn’t match expectations. Good defensive programming. 
+
+11 - house
+
+df = df[req].copy()
+
+
+Keeps only the columns you need (reduces noise/leakage and speeds up later steps). .copy() avoids SettingWithCopy warnings. 
+
+11 - house
+
+df = df.dropna(subset=req).reset_index(drop=True)
+
+
+Drops rows that have missing values in any required column; resets the index for cleanliness. 
+
+11 - house
+
+df['area'] = pd.to_numeric(df['area'], errors='coerce')
+df['bedrooms'] = pd.to_numeric(df['bedrooms'], errors='coerce')
+df['price'] = pd.to_numeric(df['price'], errors='coerce')
+
+
+Forces area, bedrooms, price to numeric; anything non-numeric becomes NaN (with errors='coerce'). Prevents later math/fit errors. 
+
+11 - house
+
+df = df.dropna(subset=['area','bedrooms','price']).reset_index(drop=True)
+
+
+Removes rows where those numeric fields couldn’t be converted (were NaN). Keeps the dataset clean for modeling. 
+
+11 - house
+
+print(df.shape)
+df.head()
+
+
+Quick sanity check: how many rows/columns now; preview first rows to confirm cleaning worked. (The .head() result will print in notebooks/REPL.) 
+
+11 - house
+
+Basic EDA (distributions & a key relationship)
+plt.figure()
+df['price'].hist(bins=30)
+plt.title("Price Distribution")
+plt.xlabel("Price")
+plt.ylabel("Count")
+plt.show()
+
+
+Histogram to see how prices are spread (skew, outliers). Choosing bins=30 gives moderate granularity. 
+
+11 - house
+
+plt.figure()
+plt.scatter(df['area'], df['price'], alpha=0.6)
+plt.plot(np.unique(df['area']), np.poly1d(np.polyfit(df['area'], df['price'], 1))(np.unique(df['area'])), color='red') 
+plt.title("Area vs Price")
+plt.xlabel("Area")
+plt.ylabel("Price")
+plt.show()
+
+
+Scatter shows the relationship between area and price (expect positive trend).
+
+np.polyfit(..., 1) fits a degree-1 polynomial (a straight line: y = m x + b).
+
+np.poly1d makes a function from those coefficients so you can compute the fitted y’s.
+
+np.unique(df['area']) sorts unique x’s to draw a clean line.
+
+Red line = best-fit trendline for quick visual confirmation of correlation. 
+
+11 - house
+
+Feature/target split
+X = df[['area','bedrooms','location']].copy()
+y = df['price'].values
+
+
+X = inputs (2 numeric + 1 categorical).
+
+y = the target array (house prices). Using .values gives a NumPy array, which many sklearn APIs accept directly. 
+
+11 - house
+
+Manual K-Fold machinery
+def make_folds(n_rows, k=5):
+    index = np.arange(n_rows)
+    np.random.shuffle(index)
+    fold_size = n_rows // k
+    folds = []
+    for i in range(k):
+        test_idx = index[i*fold_size:(i+1)*fold_size]
+        train_idx = np.setdiff1d(index, test_idx)
+        folds.append((train_idx, test_idx))
+    return folds
+
+
+Creates k shuffled folds by indices.
+
+np.random.shuffle randomizes order; fold_size is equal chunk size; for each fold i, slice a test segment and use the rest for train via np.setdiff1d.
+
+Returns a list of (train_idx, test_idx) tuples. (Equivalent to KFold from sklearn, but written explicitly.) 
+
+11 - house
+
+def calc_rmse(y_true, y_pred):
+    return np.sqrt(mean_squared_error(y_true, y_pred))
+
+
+Helper to compute RMSE = √MSE, in the same units as price (easy to interpret). 
+
+11 - house
+
+folds = make_folds(len(X), k=5)
+
+
+Build 5 folds for cross-validation. CV helps estimate generalization performance robustly. 
+
+11 - house
+
+results = []
+
+
+A list to collect per-fold metrics dictionaries. 
+
+11 - house
+
+Cross-validation loop (fit on train fold, test on holdout)
+for i, (train_idx, test_idx) in enumerate(folds, 1):
+
+
+Loop through each fold, with a 1-based fold counter i. 
+
+11 - house
+
+    X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
+    y_train, y_test = y[train_idx], y[test_idx]
+
+
+Split data into train/test by index. Critically, the next steps (encoding/scaling) are fit on train only, then applied to test → prevents data leakage. 
+
+11 - house
+
+    enc = OneHotEncoder(handle_unknown='ignore', sparse_output=False)
+    sc = StandardScaler()
+
+
+Set up the encoder (ignore unseen categories at test time; output dense array) and a scaler.
+Concept: Encoding categorical first, scaling numeric separately, then concatenating is a standard preprocessing pipeline. 
+
+11 - house
+
+    X_train_enc = np.concatenate([sc.fit_transform(X_train[['area','bedrooms']]),
+                                  enc.fit_transform(X_train[['location']])], axis=1)
+
+
+Fit+transform scaler on train’s numeric columns (learns mean/std from train only).
+
+Fit+transform encoder on train’s location (learns category set).
+
+Concatenate numeric and one-hot blocks horizontally (axis=1) to form the final training matrix. 
+
+11 - house
+
+    X_test_enc  = np.concatenate([sc.transform(X_test[['area','bedrooms']]),
+                                  enc.transform(X_test[['location']])], axis=1)
+
+
+Transform only on test with the train-fitted scaler/encoder → preserves train/test separation, no leakage. 
+
+11 - house
+
+    model = LinearRegression()
+    model.fit(X_train_enc, y_train)
+
+
+Create and train an OLS Linear Regression on the processed training data.
+Concept: OLS finds coefficients that minimize the sum of squared residuals. 
+
+11 - house
+
+    y_pred = model.predict(X_test_enc)
+
+
+Predict prices for the holdout fold to evaluate generalization. 
+
+11 - house
+
+    results.append({
+        'Fold': i,
+        'R2': r2_score(y_test, y_pred),
+        'RMSE': calc_rmse(y_test, y_pred),
+        'MAE': mean_absolute_error(y_test, y_pred)
+    })
+
+
+Compute metrics for this fold and append to results.
+
+R² (0–1-ish, higher better),
+
+RMSE (lower better, same units as price),
+
+MAE (lower better, robust to outliers). 
+
+11 - house
+
+Summarize CV
+cv_results = pd.DataFrame(results)
+print("Per Fold Results:\n", cv_results)
+print("\nAverage Scores:\n", cv_results.mean(numeric_only=True))
+
+
+Turn list of dicts into a DataFrame for neat display and compute mean metrics across folds. numeric_only=True avoids issues with the non-numeric “Fold” column. 
+
+11 - house
+
+Final model on full data (train once to get coefficients)
+enc = OneHotEncoder(handle_unknown='ignore', sparse_output=False)
+sc = StandardScaler()
+
+
+Fresh encoder/scaler for the full dataset fit. (Separate from the CV loop.) 
+
+11 - house
+
+X_cat = enc.fit_transform(X[['location']])
+X_num = sc.fit_transform(X[['area', 'bedrooms']])
+X_final = np.concatenate([X_num, X_cat], axis=1)
+
+
+Fit on all rows now (goal: learn final model and readable coefficients).
+
+X_final is the full design matrix used for training. 
+
+11 - house
+
+model = LinearRegression()
+model.fit(X_final, y)
+
+
+Train the final OLS model on all available data to get the best parameter estimates for reporting. 
+
+11 - house
+
+num_cols = ['area', 'bedrooms']
+cat_cols = list(enc.get_feature_names_out(['location']))
+all_features = num_cols + cat_cols
+
+
+Build readable feature names: two numeric columns + one-hot column names like location_<category>.
+
+get_feature_names_out ensures the one-hot columns align with coefficients. 
+
+11 - house
+
+coef_table = pd.DataFrame({
+    'Feature': all_features,
+    'Coefficient': model.coef_
+}).sort_values(by='Coefficient', ascending=False).reset_index(drop=True)
+
+
+Combine names and learned weights into a tidy table; sort to see strongest positive effects at the top.
+Concept: For standardized numeric features, coefficient magnitude roughly indicates importance; for one-hot features, coefficients represent the effect relative to the baseline (intercept captures baseline). 
+
+11 - house
+
+print("Model Intercept:", model.intercept_)
+print("\nTop Coefficients:\n")
+print(coef_table.head(10))
+
+
+Show baseline intercept_ and the top coefficients (largest positive). Helpful for interpretation/exam write-up. 
+
+11 - house
+
+Predicted vs Actual plot (full data)
+y_pred_full = model.predict(X_final)
+
+
+Predictions from the final model on the full dataset (for visualization only). 
+
+11 - house
+
+plt.scatter(y, y_pred_full, alpha=0.6, color='blue')  # fixed blue points
+p = np.poly1d(np.polyfit(y, y_pred_full, 1))
+plt.plot(np.sort(y), p(np.sort(y)), color='red')      # red best-fit line
+
+
+Scatter of Actual vs Predicted; points in blue (fixed).
+
+Fit a straight line between actual and predicted to see overall agreement; draw it in red.
+Reading the plot: Perfect predictions would align on the 45° line; the fitted red line shows the trend you achieved. 
+
+11 - house
+
+plt.title("Predicted vs Actual (Full Model)")
+plt.xlabel("Actual Price")
+plt.ylabel("Predicted Price")
+plt.show()
+
+
+Labels + title; show() renders the plot. 
+
+11 - house

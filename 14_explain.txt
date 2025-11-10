@@ -1,0 +1,343 @@
+Block 0: Imports & Global Settings (what & why)
+
+Purpose: bring in libraries for data handling, math, modeling, metrics, and set simple plotting defaults so all charts look consistent. 
+
+14 - IT
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+pandas (pd): tables, cleaning, reading files.
+
+numpy (np): fast arrays and math.
+
+matplotlib.pyplot (plt): base plotting library. 
+
+14 - IT
+
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+from math import sqrt
+
+
+StandardScaler: standardizes features (mean 0, std 1) so each feature has comparable scale (important for many models and for numerically stable training).
+
+LinearRegression: Ordinary Least Squares (OLS) regression for continuous targets.
+
+r2_score / MSE / MAE: evaluation metrics — R² (↑ better), RMSE & MAE (↓ better).
+
+sqrt: square root (for RMSE). 
+
+14 - IT
+
+plt.rcParams['figure.figsize'] = (6, 4)
+plt.rcParams['axes.grid'] = True
+
+
+Set default figure size and turn grid on — consistent, readable plots throughout. 
+
+14 - IT
+
+Block 1: Load Data (what & why)
+
+Purpose: read the Excel dataset into a DataFrame and quickly inspect shape & first rows. 
+
+14 - IT
+
+file_path = "Salary Data 14.xlsx"
+df = pd.read_excel(file_path)
+
+
+file_path: path to your dataset.
+
+pd.read_excel: reads the Excel file into df (DataFrame). 
+
+14 - IT
+
+print("Shape:", df.shape)
+df.head()
+
+
+shape: (rows, columns) — quick size check.
+
+head(): preview first 5 rows to verify columns/values loaded correctly. (In a script, print(df.head()) displays it in the console.) 
+
+14 - IT
+
+Block 2.1: Handle Missing Values (what & why)
+
+Purpose: fill nulls to avoid model errors and keep as many rows as possible. Strategy: mode for text columns, mean for numeric columns. 
+
+14 - IT
+
+print("Missing values BEFORE:\n", df.isnull().sum())
+
+
+Count nulls per column before filling — baseline for comparison. 
+
+14 - IT
+
+for c in df.columns:
+    if df[c].dtype == 'O':
+        df[c] = df[c].fillna(df[c].mode()[0])
+    else:
+        df[c] = df[c].fillna(df[c].mean())
+
+
+Loop through columns:
+
+If object dtype (strings/categories) → fill with the mode (most frequent value).
+
+If numeric → fill with mean.
+
+Prevents training errors and keeps rows that would be dropped otherwise. (Other choices exist—median, constant, model-based—but this is simple & effective.) 
+
+14 - IT
+
+print("\nMissing values AFTER:\n", df.isnull().sum())
+
+
+Confirm that nulls were handled. Ideally now all zeros. 
+
+14 - IT
+
+Block 2.2: One-Hot Encoding (what & why)
+
+Purpose: convert categorical columns into numeric indicator columns so Linear Regression can use them. Drop first level to avoid perfect multicollinearity (“dummy variable trap”). 
+
+14 - IT
+
+categorical_cols = [c for c in ['Gender','Education Level','Job Title'] if c in df.columns]
+
+
+Build a list of categorical columns that actually exist in the file (defensive — script won’t break if a column is missing). 
+
+14 - IT
+
+df_enc = pd.get_dummies(df, columns=categorical_cols, drop_first=True)
+
+
+get_dummies: one-hot encodes each listed categorical column.
+
+drop_first=True: removes one dummy per category to prevent redundant columns that cause singular matrices in OLS. 
+
+14 - IT
+
+X = df_enc.drop(columns=['Salary'])
+y = df_enc['Salary']
+
+
+X: all features except the target.
+
+y: the target (Salary). Splitting clarifies modeling steps. 
+
+14 - IT
+
+print("Feature count:", X.shape[1])
+print("Feature names:", list(X.columns)[:10], "...")
+
+
+Quick diagnostics: number of features and a peek at the first few names (especially helpful after one-hot encoding). 
+
+14 - IT
+
+Block 2.3: Feature Scaling (what & why)
+
+Purpose: standardize all features to mean 0, std 1. This stabilizes optimization and makes features comparable in magnitude; although OLS itself doesn’t require scaling for correctness, it improves numerical stability and interpretability of coefficients’ relative size. 
+
+14 - IT
+
+X = pd.DataFrame(StandardScaler().fit_transform(X), columns=X.columns)
+X.head()
+
+
+fit_transform: learn per-column mean & std on the current X, then apply scaling.
+
+Wrap back into a DataFrame with the original column names so downstream code (and interpretation) is tidy.
+
+head(): preview standardized values (should be around 0 with similar spread). 
+
+14 - IT
+
+Block 3: Manual 5-Fold CV (what & why)
+
+Purpose: robustly estimate performance by training/testing on 5 different splits. Avoids over-relying on a single lucky/unlucky split. Metrics per fold: R², RMSE, MAE; then average them. 
+
+14 - IT
+
+k = 5
+n = len(X)
+
+
+Use 5 folds; n = number of rows. 
+
+14 - IT
+
+rng = np.random.RandomState(42)
+idx = np.arange(n)
+rng.shuffle(idx)
+
+
+Prepare a reproducible RNG (seed 42).
+
+Create an index array 0..n-1 and shuffle it — randomized fold assignment. 
+
+14 - IT
+
+fold_sizes = np.full(k, n // k, dtype=int)
+fold_sizes[: n % k] += 1
+
+
+Compute how many samples each fold should get; distribute the remainder to the first folds so totals add to n. 
+
+14 - IT
+
+r2_scores, rmse_scores, mae_scores = [], [], []
+start = 0
+
+
+Lists to store metrics per fold; start tracks slicing position in the shuffled index array. 
+
+14 - IT
+
+for fold, fs in enumerate(fold_sizes, start=1):
+    test_idx = idx[start:start+fs]
+    train_idx = np.setdiff1d(idx, test_idx)
+    start += fs
+
+
+For each fold:
+
+test_idx: the next fs indices in the shuffled list.
+
+train_idx: all other indices (setdiff1d).
+
+Advance start to the next slice. 
+
+14 - IT
+
+    X_tr, X_te = X.iloc[train_idx], X.iloc[test_idx]
+    y_tr, y_te = y.iloc[train_idx], y.iloc[test_idx]
+
+
+Split data into train/test for this fold by position. No leakage—model sees only training rows when fitting. 
+
+14 - IT
+
+    model = LinearRegression()
+    model.fit(X_tr, y_tr)
+    y_pred = model.predict(X_te)
+
+
+Create OLS model → fit on training fold → predict on test fold. 
+
+14 - IT
+
+    r2 = r2_score(y_te, y_pred)
+    rmse = sqrt(mean_squared_error(y_te, y_pred))
+    mae = mean_absolute_error(y_te, y_pred)
+
+
+Evaluate predictions:
+
+R²: explained variance (can be negative if model is worse than a mean-only baseline).
+
+RMSE: √MSE in salary units — an intuitive “typical error size.”
+
+MAE: average absolute error — less sensitive to outliers than RMSE. 
+
+14 - IT
+
+    r2_scores.append(r2); rmse_scores.append(rmse); mae_scores.append(mae)
+    print(f"Fold {fold}: R^2={r2:.4f} | RMSE={rmse:.2f} | MAE={mae:.2f}")
+
+
+Store fold metrics and print a concise fold summary. 
+
+14 - IT
+
+print("\nCV Averages:")
+print(f"R^2 mean = {np.mean(r2_scores):.4f}")
+print(f"RMSE mean = {np.mean(rmse_scores):.2f}")
+print(f"MAE mean  = {np.mean(mae_scores):.2f}")
+
+
+Overall mean metrics across folds — your primary generalization estimate. 
+
+14 - IT
+
+Block 4: Plot R² across folds (what & why)
+
+Purpose: quick visual check of stability across folds (flat and high = good; huge zig-zag = unstable). 
+
+14 - IT
+
+plt.figure()
+plt.plot(range(1, k+1), r2_scores, marker='o')
+plt.title("R^2 Across 5 Folds")
+plt.xlabel("Fold")
+plt.ylabel("R^2")
+plt.show()
+
+
+Line plot with markers: fold number vs R². Easy way to spot variability between folds. 
+
+14 - IT
+
+Block 5: Final Model on ALL data (what & why)
+
+Purpose: train once on the full dataset (using all rows) to get the final model and a Predicted vs Actual visualization. We don’t judge performance using this fit (CV already did that), but it’s useful for diagnostics and deployment. 
+
+14 - IT
+
+final_model = LinearRegression()
+final_model.fit(X, y)
+y_pred_full = final_model.predict(X)
+
+
+Fit OLS on all available data; generate predictions for plotting and a quick in-sample metric snapshot. 
+
+14 - IT
+
+r2_full  = r2_score(y, y_pred_full)
+rmse_full = sqrt(mean_squared_error(y, y_pred_full))
+mae_full  = mean_absolute_error(y, y_pred_full)
+
+
+In-sample metrics (optimistic compared to CV). Good for sanity, but report CV means for true performance. 
+
+14 - IT
+
+print("Final Model (Full Data):")
+print(f"R^2 = {r2_full:.4f} | RMSE = {rmse_full:.2f} | MAE = {mae_full:.2f}")
+
+
+Display the full-data fit metrics succinctly. 
+
+14 - IT
+
+Block 6: Predicted vs Actual plot (what & why)
+
+Purpose: visualize how well predictions align with actual salaries; add a best-fit red line as a quick visual summary (closer to 45° & tighter scatter = better). 
+
+14 - IT
+
+plt.figure()
+plt.scatter(y, y_pred_full, alpha=0.6)
+plt.title("Predicted vs Actual Salary (Full Model)")
+plt.plot(y, np.poly1d(np.polyfit(y, y_pred_full, 1))(y), color='red')
+plt.xlabel("Actual Salary")
+plt.ylabel("Predicted Salary")
+plt.show()
+
+
+scatter(y, ŷ): each dot = one row (actual vs predicted).
+
+np.polyfit(y, ŷ, 1): fits a straight line (degree 1) through these points; np.poly1d turns that into a function so we can plot it.
+
+red line: best-fit trend against the cloud of points — if it’s close to y = x and the cloud is tight, your model is doing well. 
+
+14 - IT

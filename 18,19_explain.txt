@@ -1,0 +1,589 @@
+PART A — Q18: SVM for Email Spam with SMOTE (class-imbalance handling) 
+
+18,19 - svm
+
+Block overview (what & why)
+
+Imports — tools for data wrangling, plots, model prep, metrics, and SMOTE oversampling.
+
+Load & inspect — read CSV, drop an ID column, inspect and visualize class balance.
+
+Train/test split — separate features/labels and make a stratified split.
+
+SMOTE — oversample minority class in training only to balance classes.
+
+Scale — standardize features so gradient-based SVM converges well.
+
+Label mapping for hinge loss — convert {0,1} → {-1,+1}.
+
+SVM (from scratch) — linear SVM trained with subgradient on hinge loss + L2 regularization.
+
+Train, predict, evaluate — confusion matrix, Accuracy/Precision/Recall/F1, heatmap.
+
+Ranking metrics — decision scores → ROC-AUC & PR-AUC, plots.
+
+Line-by-line
+# Step 1: Import necessary libraries
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+
+Tables (pandas), fast math (NumPy), plotting (Matplotlib/Seaborn). 
+
+18,19 - svm
+
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import confusion_matrix, classification_report, accuracy_score, precision_score, recall_score, f1_score
+from imblearn.over_sampling import SMOTE
+
+
+train_test_split: reliable hold-out.
+
+StandardScaler: mean=0, std=1 → stable optimization.
+
+Metrics: standard classification KPIs.
+
+SMOTE: synthesize minority samples to fix imbalance. 
+
+18,19 - svm
+
+# Step 2: Load dataset
+data = pd.read_csv("emails_16_17_18_19.csv")
+
+
+Read your spam dataset. 
+
+18,19 - svm
+
+# Drop unnecessary columns
+data = data.drop(['Email No.'], axis=1)
+
+
+Remove row identifier (not predictive). 
+
+18,19 - svm
+
+# Inspect dataset
+print("Shape:", data.shape)
+print("\nClass Distribution:\n", data['Prediction'].value_counts())
+
+
+Quick size and class counts (0=ham, 1=spam). 
+
+18,19 - svm
+
+# Visualize initial class distribution
+sns.countplot(x='Prediction', hue='Prediction', data=data)
+plt.title("Class Distribution Before Sampling")
+plt.show()
+
+
+Bar chart of class balance (imbalance hurts training/evaluation). 
+
+18,19 - svm
+
+# Step 3: Split data into features and target
+X = data.drop('Prediction', axis=1)
+y = data['Prediction']
+
+
+X = numeric word features; y = labels. 
+
+18,19 - svm
+
+# Split into train and test sets
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+
+80/20 split, stratify keeps class proportions. 
+
+18,19 - svm
+
+print("Before Sampling:")
+print(y_train.value_counts())
+
+
+Check training balance pre-SMOTE. 
+
+18,19 - svm
+
+# Step 4: Apply SMOTE for oversampling minority class
+smote = SMOTE(random_state=42)
+X_train_bal, y_train_bal = smote.fit_resample(X_train, y_train)
+
+
+Only on train: synthesize minority samples so classes are equal → better decision boundary. 
+
+18,19 - svm
+
+print("After SMOTE Oversampling:")
+print(y_train_bal.value_counts())
+
+
+Confirm balance. 
+
+18,19 - svm
+
+# Visualize class distribution after SMOTE
+sns.countplot(x=y_train_bal, hue=y_train_bal)
+plt.title("Class Distribution After SMOTE Oversampling")
+plt.show()
+
+
+Visual proof that classes are balanced. 
+
+18,19 - svm
+
+# Step 5: Standardize the data
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train_bal)
+X_test_scaled = scaler.transform(X_test)
+
+
+Fit scaler on train_bal; apply to both sets (no leakage). Scaling helps gradient updates. 
+
+18,19 - svm
+
+# Step 6: Convert labels for hinge loss
+y_train_bal_ = np.where(y_train_bal <= 0, -1, 1)
+y_test_ = np.where(y_test <= 0, -1, 1)
+
+
+SVM hinge loss uses labels in {-1, +1}. 
+
+18,19 - svm
+
+# Step 7: Define SVM class (same structure and logic as Q19)
+class SVMfromScratch:
+    def __init__(self, learning_rate=0.001, lambda_param=0.01, n_iters=1000):
+        self.lr = learning_rate        # learning rate
+        self.lambda_param = lambda_param  # regularization (1/C)
+        self.n_iters = n_iters
+        self.w = None
+        self.b = None
+
+
+Hyperparams: lr, lambda (L2 strength, ≈1/C), iterations. Weights w, b initialized later. 
+
+18,19 - svm
+
+    def fit(self, X, y):
+        n_samples, n_features = X.shape
+        self.w = np.zeros(n_features)
+        self.b = 0
+
+
+Start from zeros. 
+
+18,19 - svm
+
+        for _ in range(self.n_iters):
+            for idx, x_i in enumerate(X):
+                condition = y[idx] * (np.dot(x_i, self.w) - self.b) >= 1
+                if condition:
+                    # correctly classified → apply regularization only
+                    self.w -= self.lr * (2 * self.lambda_param * self.w)
+                else:
+                    # misclassified → apply hinge loss gradient
+                    self.w -= self.lr * (2 * self.lambda_param * self.w - np.dot(x_i, y[idx]))
+                    self.b -= self.lr * y[idx]
+
+
+Hinge loss subgradient:
+
+If margin 
+𝑦
+𝑖
+(
+𝑤
+⋅
+𝑥
+𝑖
+−
+𝑏
+)
+≥
+1
+y
+i
+	​
+
+(w⋅x
+i
+	​
+
+−b)≥1: only L2 term shrinks w.
+
+Else: push w toward 
+𝑦
+𝑖
+𝑥
+𝑖
+y
+i
+	​
+
+x
+i
+	​
+
+ and update b opposite to 
+𝑦
+𝑖
+y
+i
+	​
+
+.
+
+Concept: maximize margin while penalizing violations. (Note: typical linear SVM uses 
+𝑤
+⋅
+𝑥
++
+𝑏
+w⋅x+b; you use 
+𝑤
+⋅
+𝑥
+−
+𝑏
+w⋅x−b in places — keep sign convention consistent; see “tiny fixes” below.) 
+
+18,19 - svm
+
+    def decision_function(self, X):
+        return np.dot(X, self.w) + self.b
+
+
+Score before threshold (distance to hyperplane). (Sign must match predict.) 
+
+18,19 - svm
+
+    def predict(self, X):
+        approx = np.dot(X, self.w) - self.b
+        return np.sign(approx)
+
+
+Predict class by sign of score. (Here you used “− b” but decision_function uses “+ b”. Make them the same.) 
+
+18,19 - svm
+
+# Step 8: Train the model (same as 19)
+svm_model = SVMfromScratch(learning_rate=0.0001, lambda_param=0.01, n_iters=100)
+svm_model.fit(X_train_scaled, y_train_bal_)
+
+
+Train the linear SVM on scaled & SMOTE’d training data. 
+
+18,19 - svm
+
+# Step 9: Prediction
+y_pred = svm_model.predict(X_test_scaled)
+# Convert {-1,1} back to {0,1}
+y_pred_final = np.where(y_pred == -1, 0, 1)
+
+
+Predictions on unseen test; map back for readability. 
+
+18,19 - svm
+
+# Step 10: Evaluation of performance
+print("----- Custom SVM (from scratch) Performance -----")
+acc = accuracy_score(y_test, y_pred_final) * 100
+prec = precision_score(y_test, y_pred_final) * 100
+rec = recall_score(y_test, y_pred_final) * 100
+f1 = f1_score(y_test, y_pred_final) * 100
+
+
+Compute classification metrics (percentage for display). 
+
+18,19 - svm
+
+print(f"Accuracy : {acc:.2f}%")
+print(f"Precision: {prec:.2f}")
+print(f"Recall   : {rec:.2f}")
+print(f"F1-Score : {f1:.2f}")
+
+
+Print clean summary. 
+
+18,19 - svm
+
+print("\nClassification Report:\n", classification_report(y_test, y_pred_final))
+print("\nConfusion Matrix:\n", confusion_matrix(y_test, y_pred_final))
+
+
+Per-class metrics & confusion table. 
+
+18,19 - svm
+
+# Visualize Confusion Matrix
+sns.heatmap(confusion_matrix(y_test, y_pred_final), annot=True, fmt='d')
+plt.title("Confusion Matrix - SVM from Scratch (Email Spam Detection)")
+plt.xlabel("Predicted")
+plt.ylabel("Actual")
+plt.show()
+
+
+Heatmap makes errors apparent. 
+
+18,19 - svm
+
+from sklearn.metrics import roc_auc_score, average_precision_score
+from sklearn.metrics import RocCurveDisplay, PrecisionRecallDisplay
+
+decision_scores = svm_model.decision_function(X_test_scaled)
+
+print("ROC-AUC:", roc_auc_score(y_test, decision_scores))
+print("PR-AUC (Average Precision):", average_precision_score(y_test, decision_scores))
+
+RocCurveDisplay.from_predictions(y_test, decision_scores)
+plt.title("ROC Curve - SVM from Scratch")
+plt.show()
+
+PrecisionRecallDisplay.from_predictions(y_test, decision_scores)
+plt.title("Precision-Recall Curve - SVM from Scratch")
+plt.show()
+
+
+Ranking metrics need a score (not class).
+
+decision_function returns that score → compute ROC-AUC and PR-AUC, and draw ROC/PR curves. (Works best if decision_function sign matches predict.) 
+
+18,19 - svm
+
+from sklearn.metrics import precision_score, recall_score, f1_score
+
+acc = accuracy_score(y_test, y_pred_final)
+prec = precision_score(y_test, y_pred_final)
+rec = recall_score(y_test, y_pred_final)
+f1 = f1_score(y_test, y_pred_final)
+
+print(f"Accuracy: {acc:.4f}")
+print(f"Precision: {prec:.4f}")
+print(f"Recall: {rec:.4f}")
+print(f"F1-score: {f1:.4f}")
+print(f"ROC-AUC: {roc:.4f}")
+
+
+Reprints metrics with more decimals.
+
+Bug: roc is undefined — change to roc_auc_score(y_test, decision_scores) (saved earlier) or store it in a variable first. 
+
+18,19 - svm
+
+PART B — Q19: SVM (from scratch) on emails.csv (no SMOTE section) 
+
+18,19 - svm
+
+Block overview
+
+Load CSV; drop ID.
+
+Split X/y; map labels 0→-1, 1→1.
+
+Stratified split; scale.
+
+Same SVM class as above; train, predict.
+
+Map back for readable metrics; confusion heatmap.
+
+Key lines (differences)
+data = pd.read_csv("emails.csv")
+data = data.drop(['Email No.'], axis=1)
+X = data.drop('Prediction', axis=1).values
+y = data['Prediction'].values
+y = np.where(y == 0, -1, 1)
+
+
+Classic setup; explicit label mapping to {-1,+1}. 
+
+18,19 - svm
+
+X_train, X_test, y_train, y_test = train_test_split(..., stratify=y)
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
+
+
+Stratified split & scaling (fit on train only). 
+
+18,19 - svm
+
+svm = SVMfromScratch(learning_rate=0.001, lambda_param=0.01, n_iters=1000)
+svm.fit(X_train, y_train)
+y_pred = svm.predict(X_test)
+
+
+Train/predict using the same scratch SVM. 
+
+18,19 - svm
+
+y_test_eval = np.where(y_test == -1, 0, 1)
+y_pred_eval = np.where(y_pred == -1, 0, 1)
+
+
+Convert for readable metrics; then print Accuracy/CM/Report and draw heatmap. 
+
+18,19 - svm
+
+PART C — Q21: SVM with Polynomial Kernel on Breast-Cancer (from scratch) 
+
+18,19 - svm
+
+Block overview
+
+Load brca.csv, drop unnamed ID, map target {'M':1,'B':0}, scale features.
+
+Polynomial kernel 
+𝐾
+(
+𝑥
+,
+𝑦
+)
+=
+(
+𝑥
+⋅
+𝑦
++
+𝑐
+)
+𝑑
+K(x,y)=(x⋅y+c)
+d
+.
+
+Kernelized SVM (dual flavor): stores training data; uses alphas and kernel matrix to score.
+
+Train on train set; predict on test; evaluate via confusion matrix, ROC curve, and Accuracy.
+
+Line-by-line highlights
+data = pd.read_csv("brca.csv")
+data = data.drop(columns=['Unnamed: 0'], errors='ignore')
+data['y'] = data['y'].map({'M': 1, 'B': 0})
+X = data.drop(columns=['y']).values
+y = data['y'].values
+
+
+Clean target to {0,1}. Features to NumPy. 
+
+18,19 - svm
+
+scaler = StandardScaler()
+X = scaler.fit_transform(X)
+X_train, X_test, y_train, y_test = train_test_split(...)
+
+
+Scale (important for kernel SVM stability), then split. 
+
+18,19 - svm
+
+def polynomial_kernel(X1, X2, degree=3, c=1):
+    return (np.dot(X1, X2.T) + c) ** degree
+
+
+Polynomial similarity function; degree controls curve complexity; c shifts. 
+
+18,19 - svm
+
+class SVMPolynomial:
+    def __init__(..., degree=2, c=1):
+        ...
+    def fit(self, X, y):
+        y_ = np.where(y <= 0, -1, 1)
+        self.alpha = np.zeros(n_samples)
+        self.K = polynomial_kernel(X, X, self.degree, self.c)
+
+
+Dual-style training variables: alphas per sample; precompute kernel matrix K. Labels to {-1,+1}. 
+
+18,19 - svm
+
+        for _ in range(self.n_iters):
+            for i in range(n_samples):
+                condition = y_[i] * (np.sum(self.alpha * y_ * self.K[:, i])) >= 1
+                if condition:
+                    self.alpha[i] -= self.lr * (2 * self.lambda_param * self.alpha[i])
+                else:
+                    self.alpha[i] += self.lr * (1 - y_[i] * np.sum(self.alpha * y_ * self.K[:, i]))
+
+
+Subgradient-style updates in dual variables. Intuition: similar “margin check” as linear case but in kernel space. 
+
+18,19 - svm
+
+    def project(self, X):
+        K = polynomial_kernel(X, self.X_train, self.degree, self.c)
+        return np.dot(K, self.alpha * self.y_train)
+    def predict(self, X):
+        pred = self.project(X)
+        return np.sign(pred)
+
+
+Score new points using kernel with support vectors (here all train points weighted by alpha). Sign → class. 
+
+18,19 - svm
+
+svm_poly = SVMPolynomial(..., degree=2, c=1)
+svm_poly.fit(X_train, y_train)
+y_pred = svm_poly.predict(X_test)
+y_pred = np.where(y_pred == -1, 0, 1)
+
+
+Train, predict, and map labels back for evaluation. 
+
+18,19 - svm
+
+cm = confusion_matrix(y_test, y_pred)
+fpr, tpr, _ = roc_curve(y_test, y_pred)
+roc_auc = auc(fpr, tpr)
+
+
+Confusion matrix; ROC based on predicted labels (note: better to use scores from project for smoother ROC). 
+
+18,19 - svm
+
+plt.plot(fpr, tpr, ... label=f'... (AUC = {roc_auc:.2f})')
+...
+accuracy = np.mean(y_pred == y_test) * 100
+print(f"Model Accuracy: {accuracy:.2f}%")
+
+
+Plot ROC and print Accuracy. 
+
+18,19 - svm
+
+Tiny fixes & polish (safe to apply)
+
+Consistent decision function (Q18/Q19): use the same sign for b everywhere. E.g., pick score = X.dot(w) + b and then:
+
+in fit: condition = y[idx]*(x_i.dot(w) + b) >= 1
+
+in decision_function: return X.dot(w) + b
+
+in predict: return np.sign(X.dot(w) + b) 
+
+18,19 - svm
+
+Undefined variable: replace print(f"ROC-AUC: {roc:.4f}") with:
+
+roc_auc = roc_auc_score(y_test, decision_scores)
+print(f"ROC-AUC: {roc_auc:.4f}")
+``` :contentReference[oaicite:45]{index=45}
+
+
+ROC with scores (Q21): prefer scores = svm_poly.project(X_test) then roc_curve(y_test, scores) for a more informative AUC. 
+
+18,19 - svm
+
+Efficiency: the inner double-loop SVM is educational; for speed, vectorize or compare with sklearn.svm.LinearSVC / SVC(kernel='poly') as a reference baseline. 
+
+18,19 - svm

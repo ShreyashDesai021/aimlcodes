@@ -1,0 +1,299 @@
+Block-level roadmap (what each section does & why)
+
+Imports & display options — load the libraries needed for data handling, plotting, modeling, and metrics; make DataFrame prints neat. 
+
+13 -student_exam
+
+Load dataset & quick peek — read the CSV, print shape and first rows to confirm columns/values. 
+
+13 -student_exam
+
+Select features/target + sanity checks — define input columns (X) and the target (y), verify required columns exist, summarize. 
+
+13 -student_exam
+
+Basic EDA visuals — plot target distribution and a key relationship (Hours vs Score) with a best-fit line. 
+
+13 -student_exam
+
+K-Fold cross-validation — evaluate Linear Regression robustly by training/testing on multiple folds; collect R²/RMSE/MAE per fold and summarize mean/std. 
+
+13 -student_exam
+
+Final model on all data — fit once on the whole dataset to get final coefficients aligned with features. 
+
+13 -student_exam
+
+Predicted vs Actual plot — visualize full-model performance with points (blue) and a best-fit red line. 
+
+13 -student_exam
+
+Line-by-line walkthrough (plain English + concepts)
+Imports & display
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import KFold
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+import math
+import matplotlib.pyplot as plt
+
+
+pandas: table-like data handling.
+
+numpy: numerical arrays & math.
+
+KFold: cross-validation splitter (creates K train/test partitions).
+
+LinearRegression: Ordinary Least Squares model for continuous targets.
+
+metrics:
+
+r2_score = variance explained (↑ better),
+
+mean_squared_error for MSE (↓ better),
+
+mean_absolute_error for MAE (↓ better).
+
+math: here for sqrt (could also use np.sqrt).
+
+matplotlib.pyplot: plotting. 
+
+13 -student_exam
+
+pd.set_option('display.precision', 4)
+
+
+Makes DataFrame numbers print with 4 decimal places — cleaner outputs. 
+
+13 -student_exam
+
+Load dataset & quick peek
+# Update the path if needed
+DATA_PATH = "student_exam_scores_12_13.csv"
+df = pd.read_csv(DATA_PATH)
+
+
+Set the CSV path and read it into df. If the file isn’t in the working folder, update DATA_PATH. 
+
+13 -student_exam
+
+print("Shape:", df.shape)
+display(df.head())
+
+
+Shape shows (rows, columns) — quick sanity check on size.
+
+head() shows the first five rows to verify columns and data types look right. (In plain Python, display works in notebooks; print(df.head()) is a safe alternative.) 
+
+13 -student_exam
+
+Choose features & target + defensive checks
+feature_cols = ["hours_studied", "attendance_percent", "Internal_marks"]
+target_col = "exam_score"
+
+
+Define predictors (X columns) and the outcome (y). Make sure the column names match the CSV exactly (note the capital I in Internal_marks). 
+
+13 -student_exam
+
+# Defensive checks
+missing = [c for c in feature_cols + [target_col] if c not in df.columns]
+if missing:
+    raise ValueError(f"Missing required columns: {missing}")
+
+
+Early validation: if any required column is missing, stop with a clear error listing which ones. Prevents subtle downstream failures. 
+
+13 -student_exam
+
+X = df[feature_cols].copy()
+y = df[target_col].astype(float).copy()
+
+
+Extract X (features) and y (target).
+
+Cast y to float to ensure numeric operations work (e.g., metrics). .copy() avoids chained assignment surprises. 
+
+13 -student_exam
+
+display(X.describe().T)
+print("\nTarget summary:")
+display(y.describe())
+
+
+describe() summary for features (count/mean/std/min/max/quartiles).
+
+Same for y: check its distribution and scale; spot odd values. .T transposes for a tall, readable table. 
+
+13 -student_exam
+
+EDA: distribution & relationship
+# Exam score distribution (mirrors 'Price Distribution' in reference)
+plt.figure()
+plt.hist(df[target_col], bins=30)
+plt.title("Exam Score Distribution")
+plt.xlabel("Exam Score")
+plt.ylabel("Count")
+plt.show()
+
+
+Histogram of exam scores: shows spread, skewness, and potential outliers. Bins=30 gives moderate resolution. 
+
+13 -student_exam
+
+# Scatter plot with best-fit red line
+x = df["hours_studied"]
+y = df[target_col]
+
+plt.scatter(x, y, alpha=0.6, color='blue')
+p = np.poly1d(np.polyfit(x, y, 1))
+plt.plot(np.sort(x), p(np.sort(x)), color='red')
+
+plt.title("Hours Studied vs Exam Score")
+plt.xlabel("Hours Studied")
+plt.ylabel("Exam Score")
+plt.show()
+
+
+Scatter: visualize how exam score changes with hours studied (expect positive trend).
+
+np.polyfit(x, y, 1) fits a degree-1 polynomial (a straight line), returning coefficients [m, c].
+
+np.poly1d(...) turns them into a callable function.
+
+Plot the red best-fit line on sorted x to draw it cleanly. This visually validates linearity. 
+
+13 -student_exam
+
+K-Fold cross-validation
+# K-Fold setup and evaluation
+K = 5  # change if needed
+kf = KFold(n_splits=K, shuffle=True, random_state=42)
+
+
+Use 5-fold CV: the data is split into 5 parts; each part serves as test once.
+
+shuffle=True randomizes rows before splitting (reduces ordering bias).
+
+random_state=42 makes the split reproducible. 
+
+13 -student_exam
+
+fold_results = []
+fold_num = 1
+
+
+Prepare to store per-fold metrics and number the folds. 
+
+13 -student_exam
+
+for train_idx, test_idx in kf.split(X):
+    X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
+    y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
+
+
+kf.split(X) yields indices for train/test for each fold.
+
+Use .iloc to slice by position. Concept: the model only sees train rows to avoid leakage; we evaluate on test rows it hasn’t seen. 
+
+13 -student_exam
+
+    model = LinearRegression()
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+
+
+Create and train OLS regression on the current training fold.
+
+Predict on the held-out test fold to measure generalization. 
+
+13 -student_exam
+
+    r2 = r2_score(y_test, y_pred)
+    rmse = math.sqrt(mean_squared_error(y_test, y_pred))
+    mae = mean_absolute_error(y_test, y_pred)
+
+
+R²: fraction of variance explained (closer to 1 is better; can be negative if the fit is bad).
+
+RMSE: √MSE, same units as the target → intuitive “typical error”.
+
+MAE: average absolute error, robust to outliers. 
+
+13 -student_exam
+
+    fold_results.append({"Fold": fold_num, "R2": r2, "RMSE": rmse, "MAE": mae})
+    fold_num += 1
+
+
+Save results for this fold; increment the fold counter. 
+
+13 -student_exam
+
+fold_df = pd.DataFrame(fold_results)
+display(fold_df)
+
+
+Make a neat table of per-fold metrics to inspect variability. 
+
+13 -student_exam
+
+summary = pd.DataFrame({
+    "Metric": ["R2", "RMSE", "MAE"],
+    "Mean": [fold_df["R2"].mean(), fold_df["RMSE"].mean(), fold_df["MAE"].mean()],
+    "Std":  [fold_df["R2"].std(ddof=1), fold_df["RMSE"].std(ddof=1), fold_df["MAE"].std(ddof=1)]
+})
+display(summary)
+
+
+Summary table: overall mean and standard deviation across folds.
+
+ddof=1 computes the sample standard deviation. Interpretation: lower std ⇒ more stable performance across folds. 
+
+13 -student_exam
+
+Final model on the full dataset
+lr_full = LinearRegression()
+lr_full.fit(X, y)
+
+
+Train once on all rows to obtain the final model used for interpretation/reporting. (We don’t judge performance with this fit; CV already did that.) 
+
+13 -student_exam
+
+print("Final model coefficients (aligned with features):")
+coef_table = pd.DataFrame({"Feature": X.columns, "Coefficient": lr_full.coef_})
+display(coef_table)
+print("Intercept:", lr_full.intercept_)
+
+
+Build a readable coefficients table: each row aligns a feature with its learned weight.
+
+Interpretation tips:
+
+Coefficient for hours_studied ≈ “change in score” per one unit increase in hours (holding others constant).
+
+Intercept = predicted score when all features are 0 (may or may not be meaningful in practice). 
+
+13 -student_exam
+
+Predicted vs Actual visualization (full model)
+# Predicted vs Actual with best-fit red line
+y_pred_full = lr_full.predict(X)
+
+plt.scatter(y, y_pred_full, alpha=0.6, color='blue')  # blue points
+p = np.poly1d(np.polyfit(y, y_pred_full, 1))          # fit regression line
+plt.plot(np.sort(y), p(np.sort(y)), color='red')      # red line
+
+plt.title("Predicted vs Actual (Full Model)")
+plt.xlabel("Actual Exam Score")
+plt.ylabel("Predicted Exam Score")
+plt.show()
+
+
+Plot Actual vs Predicted to visually assess fit.
+
+Perfect predictions lie on the 45° line; the red best-fit line shows your achieved trend — closer to 45° & tighter scatter ⇒ better fit. 
+
+13 -student_exam
